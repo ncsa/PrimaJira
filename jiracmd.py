@@ -50,9 +50,8 @@ class Jira:
             # change the issue type if needed
 		    'issuetype':{'name':'Sub-task'},
 		    'description': description,
-		    'parent':{'key': parent_issue.key}
-           #, i dont have the privilege for assignee assignment
-		   # 'assignee':{'name': assignee},
+		    'parent':{'key': parent_issue.key},
+		    'assignee':{'name': assignee}
 		    }
         subtask = self.jira.create_issue(fields=subtask_dict)
         return subtask.key	
@@ -62,7 +61,7 @@ class Jira:
 		    'summary': summary,
 		    'issuetype':{'name':'Processing Request'},
 		    'description': description,
-		    'assignee':{'name': assignee},
+		    'assignee':{'name': assignee}
 		    }	
         ticket = self.jira.create_issue(fields=ticket_dict)
         return ticket.key	
