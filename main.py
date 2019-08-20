@@ -17,29 +17,36 @@ primaserver=primadict['server']
 jcon = Jira('jira-section')
 # ju.create_ticket('jira-section', jcon.user, ticket=None, parent="5", summary='summary', description='descript', project='LSSTTST')
 
-# Enterprise Project Structure
-request_data = {
-    'Field': 'Name'}
-wsdl_url = 'https://uofi-stage-p6.oracleindustry.com/p6ws/services/EPSService?wsdl'
-soap_client = c.Client(wsdl_url, wsse=UsernameToken(primauser, primapasswd))
-# with soap_client.settings(raw_response=False):
-#     api_result = soap_client.service.ReadEPS(**request_data)
-pass
 
-# ActivityStepService
+# Get information about ACTIVITIES from ActivityService
 request_data = {
-    'Field': ['ActivityName', 'ActivityId']}
-wsdl_url = 'https://uofi-stage-p6.oracleindustry.com/p6ws/services/ActivityStepService?wsdl'
+    'Field': ['ObjectId', 'ProjectName'],
+    'Filter': "ObjectId = '37183'"} # replace this with check for JIRA import need
+wsdl_url = primaserver + '/p6ws/services/ActivityService?wsdl'
 soap_client = c.Client(wsdl_url, wsse=UsernameToken(primauser, primapasswd))
 with soap_client.settings(raw_response=False):
-    api_result = soap_client.service.ReadActivitySteps(**request_data)
+    activities_api = soap_client.service.ReadActivities(**request_data)
+
+# reprocess the api response into a more managable dict
+activities = {}
+# also build a dict of all relevant steps
+steps = {}
+for act in activities_api:
+    activities.update({act.ObjectId : act.ProjectName})
+
+    # Get information about STEPS from ActivityStepService
+    request_data = {
+        'Field': ['ActivityObjectId', 'ObjectId', 'Name', 'Description'],
+        'Filter': "ActivityObjectId = '%s'" % act.ObjectId}
+    wsdl_url = primaserver + '/p6ws/services/ActivityStepService?wsdl'
+    soap_client = c.Client(wsdl_url, wsse=UsernameToken(primauser, primapasswd))
+    with soap_client.settings(raw_response=False):
+        steps_api = soap_client.service.ReadActivitySteps(**request_data)
+    for step in steps_api:
+        steps.update({step.ObjectId: {'ActivityObjectId': step.ActivityObjectId,
+                                       'Name': step.Name,
+                                       'Description': step.Description
+                                      }})
+
 pass
 
-# ActivityService
-request_data = {
-    'Field': 'WBSName'}
-wsdl_url = 'https://uofi-stage-p6.oracleindustry.com/p6ws/services/ActivityService?wsdl'
-soap_client = c.Client(wsdl_url, wsse=UsernameToken(primauser, primapasswd))
-with soap_client.settings(raw_response=False):
-    api_result = soap_client.service.ReadActivities(**request_data)
-pass
