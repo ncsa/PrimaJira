@@ -61,7 +61,7 @@ def get_reqnum_from_nite(parent,nite):
 
 def use_existing_ticket(con,dict):
     """Looks to see if JIRA ticket exists. If it does it will use it instead
-       of creating a new subticket.Returns reqnum,jira_id"""
+       of creating a new subticket. Returns reqnum,jira_id"""
     issues,count = con.search_for_issue(dict['parent'],dict['summary'])
     if count != 0:
         reqnum = str(issues[0].key).split('-')[1]
