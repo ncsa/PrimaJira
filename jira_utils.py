@@ -17,7 +17,7 @@ def get_con(jira_section, retry = 3,sleep = 15):
             print "JIRA Connection Error...Retry #{num}".format(num=num_retries)
 
 def does_comment_exist(con,reqnum=None):
-        key= "DESOPS-%s" % reqnum
+        key= "LSSTTST-%s" % reqnum
         jira_tix = con.get_issue(key)
         all_comments = jira_tix.fields.comment.comments
         if len(all_comments) == 0:
@@ -30,7 +30,7 @@ def make_comment(con,datetime=None,content='',reqnum=None,attempt=None):
         comment = """Submit started at %s
                      -----
                      %s""" % (datetime,content)
-        key= "DESOPS-%s" % reqnum
+        key= "LSSTTST-%s" % reqnum
         jira_tix = con.get_issue(key)
         all_comments = jira_tix.fields.comment.comments
         con.add_jira_comment(key,comment)
@@ -50,7 +50,7 @@ def get_jira_user(section='jira-desdm',services_file=None):
 def get_reqnum_from_nite(parent,nite):
     """Used for auto-submit for firstcut. If nite exists under parent, grab the reqnum to be used in resubmit_failed."""
     con = get_con('jira-desdm')
-    parent = 'DESOPS-' + str(parent)
+    parent = 'LSSTTST-' + str(parent)
     issues, count = con.search_for_issue(parent, nite)
     if count != 0:
         reqnum = str(issues[0].key).split('-')[1]
@@ -83,12 +83,12 @@ def create_subticket(con,dict):
     jira_id = dict['parent']
     return (reqnum, jira_id)    
 
-def create_ticket(jira_section,jira_user,ticket=None,parent=None,summary=None,description=None,use_existing=False,project='DESOPS'):
+def create_ticket(jira_section,jira_user,ticket=None,parent=None,summary=None,description=None,use_existing=False,project='LSSTTST'):
     """ Create a JIRA ticket for use in framework processing. If parent is specified, 
     will create a subticket. If ticket is specified, will use that ticket. If no parent 
     or ticket specified, will create a parent and then a subticket. Parent and ticket
     should be specified as the number, e.g., 1515. Returns tuple (reqnum,jira_id):
-    (1572,DESOPS-1515)"""
+    (1572,LSSTTST-1515)"""
     args_dict = {'jira_section':jira_section,'jira_user':jira_user,
                  'parent':parent,'ticket':ticket,'summary':summary,
                  'description':description,'use_existing':use_existing,
@@ -133,10 +133,10 @@ def create_ticket(jira_section,jira_user,ticket=None,parent=None,summary=None,de
     if not ticket and not parent:
         parent_summary = "%s's Processing Tickets" % jira_user
         parent_description = "Parent ticket for %s's processing tests." % jira_user
-        is_parent = con.search_for_parent('DESOPS',parent_summary)
+        is_parent = con.search_for_parent('LSSTTST',parent_summary)
         if is_parent[1] == 0:
             # If no parent ticket found create one
-            parent = str(con.create_jira_ticket('DESOPS',parent_summary,parent_description,jira_user))
+            parent = str(con.create_jira_ticket('LSSTTST',parent_summary,parent_description,jira_user))
             args_dict['parent'] = parent
             if use_existing:
                 reqnum,jira_id = use_existing_ticket(con,args_dict)

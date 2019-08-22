@@ -16,7 +16,6 @@ primaserver=primadict['server']
 
 # init jira and primavera connections
 jcon = Jira('jira-section')
-# ju.create_ticket('jira-section', jcon.user, ticket=None, parent="5", summary='summary', description='descript', project='LSSTTST')
 
 
 # Get all object -> ticket field records
@@ -77,4 +76,22 @@ for act in activities_api:
                                       }})
 
 # At this point, we have everything to export from Primavera
+# This is the Jira section
+# ju.create_ticket('jira-section', jcon.user, ticket=None, parent="5", summary='summary', description='descript', project='LSSTTST')
+for act in activities:
+    if act in tickets.keys():
+        # if the ticket already exists, update name etc
+        # TODO: put sync logic here
+        pass
+    else:
+        # create a ticket if one doesn't exist
+        # TODO:
+        reqnum, jira_id = ju.create_ticket('jira-section', jcon.user, ticket=None, parent=None, summary=step.Name, description=step.Description,
+                         project='LSSTTST')
 
+    # go through steps of the activity in question and create their tickets
+    activity_steps = []
+    for step in steps:
+        if step['ActivityObjectId'] == act:
+            ju.create_ticket('jira-section', jcon.user, ticket=None, parent=reqnum, summary='summary',
+                             description='descript', project='LSSTTST')
