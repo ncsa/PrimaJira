@@ -46,7 +46,7 @@ with soap_client.settings(raw_response=False):
 for sync in synched:
     # Get information about ACTIVITIES from ActivityService
     request_data = {
-        'Field': ['ObjectId', 'ProjectName'],
+        'Field': ['ObjectId', 'Name', 'Id'],
         'Filter': "ObjectId = '%s'" % sync.ObjectId} # replace this with check for JIRA import need
     wsdl_url = primaserver + '/p6ws/services/ActivityService?wsdl'
     soap_client = c.Client(wsdl_url, wsse=UsernameToken(primauser, primapasswd))
@@ -59,7 +59,8 @@ activities = {}
 # also build a dict of all relevant steps
 steps = {}
 for act in activities_api:
-    activities.update({act.ObjectId : act.ProjectName})
+    activities.update({act.ObjectId : {'Name': act.Name,
+                                       'Id': act.Id}})
     # Get information about STEPS from ActivityStepService
     # only needed steps are retrieved to save traffic and execution time
     request_data = {
@@ -85,13 +86,13 @@ for act in activities:
         pass
     else:
         # create a ticket if one doesn't exist
-        # TODO:
-        reqnum, jira_id = ju.create_ticket('jira-section', jcon.user, ticket=None, parent=None, summary=step.Name, description=step.Description,
-                         project='LSSTTST')
-
+        reqnum, jira_id = ju.create_ticket('jira-section', jcon.user, ticket=None, parent=None, summary=activities[act]['Name'],
+                                           description=None, project='LSSTTST',
+                                           prima_code=activities[act]['Id'])
+        # TODO: POST jira_id back into primavera
+        pass
     # go through steps of the activity in question and create their tickets
-    activity_steps = []
     for step in steps:
-        if step['ActivityObjectId'] == act:
-            ju.create_ticket('jira-section', jcon.user, ticket=None, parent=reqnum, summary='summary',
-                             description='descript', project='LSSTTST')
+        if steps[step]['ActivityObjectId'] == act:
+            ju.create_ticket('jira-section', jcon.user, ticket=None, parent=reqnum, summary=steps[step]['Name'],
+                             description=steps[step]['Description'], project='LSSTTST')

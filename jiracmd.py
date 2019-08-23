@@ -21,8 +21,8 @@ class Jira:
         self.server = jiraserver
         self.user = jirauser
 
-    def search_for_issue(self,parent,summary):
-        jql = 'summary ~ "\\"%s\\"" and parent = "%s"' % (summary,parent)
+    def search_for_issue(self,summary):
+        jql = 'summary ~ "\\"%s\\""' % (summary)
         issue = self.jira.search_issues(jql)
         count = len(issue)
         return (issue,count)
@@ -59,7 +59,7 @@ class Jira:
     def create_jira_ticket(self,project,summary,description,assignee):
         ticket_dict = {'project':{'key':project},
 		    'summary': summary,
-		    'issuetype':{'name':'Processing Request'},
+		    'issuetype':{'name':'Story'},
 		    'description': description,
 		    'assignee':{'name': assignee}
 		    }	
