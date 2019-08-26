@@ -20,7 +20,7 @@ jcon = Jira('jira-section')
 
 # Get all object -> ticket field records
 request_data = {
-    'Field': ['ForeignObjectId', 'Text'],
+    'Field': ['ForeignObjectId', 'Text', 'ProjectObjectId', 'UDFTypeObjectId'],
     'Filter': "UDFTypeTitle = 'LSST Jira Mapping'"}
 wsdl_url = primaserver + '/p6ws/services/UDFValueService?wsdl'
 soap_client = c.Client(wsdl_url, wsse=UsernameToken(primauser, primapasswd))
@@ -34,20 +34,19 @@ for tkt in tickets_api:
 
 
 # get all activities to sync
-# TODO: replace this with check for JIRA import need
 request_data = {
-    'Field': ['ObjectId'],
-    'Filter': "CreateUser = 'EKIMTCOV'"}
-wsdl_url = primaserver + '/p6ws/services/ActivityService?wsdl'
+    'Field': ['Indicator','ForeignObjectId'],
+    'Filter': "UDFTypeTitle = 'Import into JIRA' and Indicator = 'Green'"}
+wsdl_url = primaserver + '/p6ws/services/UDFValueService?wsdl'
 soap_client = c.Client(wsdl_url, wsse=UsernameToken(primauser, primapasswd))
 with soap_client.settings(raw_response=False):
-    synched = soap_client.service.ReadActivities(**request_data)
+    synched = soap_client.service.ReadUDFValues(**request_data)
 
 for sync in synched:
     # Get information about ACTIVITIES from ActivityService
     request_data = {
         'Field': ['ObjectId', 'Name', 'Id'],
-        'Filter': "ObjectId = '%s'" % sync.ObjectId} # replace this with check for JIRA import need
+        'Filter': "ObjectId = '%s'" % sync.ForeignObjectId} # replace this with check for JIRA import need
     wsdl_url = primaserver + '/p6ws/services/ActivityService?wsdl'
     soap_client = c.Client(wsdl_url, wsse=UsernameToken(primauser, primapasswd))
     with soap_client.settings(raw_response=False):
@@ -87,7 +86,7 @@ for act in activities:
     else:
         # create a ticket if one doesn't exist
         reqnum, jira_id = ju.create_ticket('jira-section', jcon.user, ticket=None, parent=None, summary=activities[act]['Name'],
-                                           description=None, project='LSSTTST',
+                                           description=activities[act]['Name'], use_existing=True, project='LSSTTST',
                                            prima_code=activities[act]['Id'])
         # TODO: POST jira_id back into primavera
         pass
@@ -95,4 +94,4 @@ for act in activities:
     for step in steps:
         if steps[step]['ActivityObjectId'] == act:
             ju.create_ticket('jira-section', jcon.user, ticket=None, parent=reqnum, summary=steps[step]['Name'],
-                             description=steps[step]['Description'], project='LSSTTST')
+                             description=steps[step]['Name'], use_existing=True, project='LSSTTST')

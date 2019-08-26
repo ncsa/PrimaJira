@@ -48,9 +48,9 @@ class Jira:
         subtask_dict = {'project':{'key':parent_issue.fields.project.key},
 		    'summary': summary,
             # change the issue type if needed
-		    'issuetype':{'name':'Sub-task'},
+		    'issuetype':{'name':'Story'},
 		    'description': description,
-		    'parent':{'key': parent_issue.key},
+		    'customfield_10536': parent_issue.key, # this is the epic link
 		    'assignee':{'name': assignee}
 		    }
         subtask = self.jira.create_issue(fields=subtask_dict)
@@ -58,8 +58,9 @@ class Jira:
 
     def create_jira_ticket(self,project,summary,description,assignee):
         ticket_dict = {'project':{'key':project},
-		    'summary': summary,
-		    'issuetype':{'name':'Story'},
+		    'customfield_10537': summary, # THIS MIGHT (READ: DOES 100%) CHANGE IN DIFFERENT JIRA INSTANCES
+            'summary': summary,
+		    'issuetype':{'name':'Epic'},
 		    'description': description,
 		    'assignee':{'name': assignee}
 		    }	

@@ -77,11 +77,18 @@ def use_existing_ticket(con,dict):
 def create_subticket(con,dict):
     """Takes a JIRA connection object and a dictionary and creates a
        subticket. Returns the reqnum,jira_id"""
-    subticket = str(con.create_jira_subtask(dict['parent'],dict['summary'],
-                                             dict['description'],dict['jira_user']))
-    reqnum = subticket.split('-')[1]
-    jira_id = dict['parent']
-    return (reqnum, jira_id)
+    issues, count = con.search_for_issue(dict['summary'])
+    if count != 0:
+        # If a subticket with this exact name exists, we can just use it
+        reqnum = str(issues[0].key).split('-')[1]
+        jira_id = issues[0].key
+        return (reqnum, jira_id)
+    else:
+        subticket = str(con.create_jira_subtask(dict['parent'],dict['summary'],
+                                                 dict['description'],dict['jira_user']))
+        reqnum = subticket.split('-')[1]
+        jira_id = dict['parent']
+        return (reqnum, jira_id)
 
 def create_ticket(jira_section, jira_user, ticket=None, parent=None, summary=None, description=None, use_existing=False,
                   project='LSSTTST', prima_code=None):
@@ -126,12 +133,8 @@ def create_ticket(jira_section, jira_user, ticket=None, parent=None, summary=Non
         args_dict['parent'] = parent
 
         # Create subticket under specified parent ticket
-        if use_existing:
-            reqnum,jira_id = use_existing_ticket(con,args_dict)
-            return (reqnum,jira_id)
-        else:
-            reqnum,jira_id = create_subticket(con,args_dict)
-            return (reqnum,jira_id)
+        reqnum,jira_id = create_subticket(con,args_dict)
+        return (reqnum,jira_id)
     if not ticket and not parent:
         reqnum, jira_id = use_existing_ticket(con, args_dict)
         return (reqnum, jira_id)
