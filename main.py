@@ -121,6 +121,7 @@ for act in activities:
     if act in tickets.keys():
         # if the ticket already exists, update name etc
         # TODO: put sync logic here
+        # TODO: add a check to see if the ticket id reported by jira matches the one on the record
         pass
     else:
         # post if the lsst id needs to be entered
@@ -134,5 +135,4 @@ for act in activities:
             else:
                 step_reqnum, step_jira_id = ju.create_ticket('jira-section', jcon.user, ticket=None, parent=reqnum,
                                         summary=steps[step]['Name'], description=steps[step]['Name'], project='LSSTTST')
-                resp = ticket_post(primauser, primapasswd, step, steps[step]['ProjectId'], step_jira_id, 528)
-                # TODO: fix steps not posting
+                resp = ticket_post(primauser, primapasswd, step, steps[step]['ProjectId'], step_jira_id, 329)
