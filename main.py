@@ -42,6 +42,17 @@ def soap_request(request_data, primaserver, primaservice, servicereq, user, pw):
         api_response = getattr(soap_client.service, servicereq)(**request_data)
     return api_response
 
+def get_activity_scope(act_id, primaserver, user, pw):
+    # attempt to retrieve the scope notebook record of the activity
+    request_data = {
+        'Field': ['RawTextNote'],
+        'Filter': "ActivityObjectId = '%s' and NotebookTopicName = 'Scope'" % str(act_id)}
+    act_note_api = soap_request(request_data, primaserver, 'ActivityNoteService', 'ReadActivityNotes', user, pw)
+    if len(act_note_api) == 0:
+        return None
+    else:
+        return act_note_api[0]['RawTextNote']
+
 
 # read config and get primavera login info
 parser = configparser.ConfigParser()
@@ -92,22 +103,28 @@ for sync in synched:
         'Filter': "ObjectId = '%s'" % sync.ForeignObjectId} # replace this with check for JIRA import need
     activities_api = soap_request(request_data, primaserver, 'ActivityService', 'ReadActivities', primauser, primapasswd)
 
-    for act in activities_api:
-        activities.update({act.ObjectId : {'ProjectId': act.ProjectId,
-                                           'Name': act.Name,
-                                           'Id': act.Id}})
-        # Get information about STEPS from ActivityStepService
-        # only needed steps are retrieved to save traffic and execution time
-        request_data = {
-            'Field': ['ActivityObjectId', 'ObjectId', 'Name', 'Description', 'ProjectId'],
-            'Filter': "ActivityObjectId = '%s'" % act.ObjectId}
-        steps_api = soap_request(request_data, primaserver, 'ActivityStepService', 'ReadActivitySteps', primauser, primapasswd)
-        for step in steps_api:
-            steps.update({step.ObjectId: {'ActivityObjectId': step.ActivityObjectId,
-                                          'Name': step.Name,
-                                          'Description': step.Description,
-                                          'ProjectId': step.ProjectId
-                                          }})
+    # TODO: fix this unnesessary loop
+    if len(activities_api) > 1:
+        print('activities_api returned ' + str(len(activities_api)) + 'results!')
+        exit(0)
+
+    activities.update({activities_api[0].ObjectId : {'ProjectId': activities_api[0].ProjectId,
+                                       'Name': activities_api[0].Name,
+                                       'Id': activities_api[0].Id,
+                                       'Description': get_activity_scope(activities_api[0].ObjectId,
+                                                                         primaserver, primauser, primapasswd)}})
+    # Get information about STEPS from ActivityStepService
+    # only needed steps are retrieved to save traffic and execution time
+    request_data = {
+        'Field': ['ActivityObjectId', 'ObjectId', 'Name', 'Description', 'ProjectId'],
+        'Filter': "ActivityObjectId = '%s'" % activities_api[0].ObjectId}
+    steps_api = soap_request(request_data, primaserver, 'ActivityStepService', 'ReadActivitySteps', primauser, primapasswd)
+    for step in steps_api:
+        steps.update({step.ObjectId: {'ActivityObjectId': step.ActivityObjectId,
+                                      'Name': step.Name,
+                                      'Description': step.Description,
+                                      'ProjectId': step.ProjectId
+                                      }})
 
 
 # At this point, we have everything to export from Primavera
@@ -116,7 +133,7 @@ for act in activities:
     # this will not create duplicates because of a check
     reqnum, jira_id = ju.create_ticket('jira-section', jcon.user, ticket=None, parent=None,
                                        summary=activities[act]['Name'],
-                                       description=activities[act]['Name'], use_existing=True, project='LSSTTST',
+                                       description=activities[act]['Description'], use_existing=True, project='LSSTTST',
                                        prima_code=activities[act]['Id'])
     if act in tickets.keys():
         # if the ticket already exists, update name etc
