@@ -53,6 +53,13 @@ def get_activity_scope(act_id, primaserver, user, pw):
     else:
         return act_note_api[0]['RawTextNote']
 
+def wbs_extractor(raw):
+    try:
+        return re.search('\S+(\.\S)+([^" "]+)', raw).group(0)
+    except AttributeError:
+        return None
+
+
 
 # read config and get primavera login info
 parser = configparser.ConfigParser()
@@ -85,8 +92,12 @@ step_tickets_api = soap_request(request_data, primaserver, 'UDFValueService', 'R
 # create a dict with step -> ticket relations
 step_tickets = {}
 for tkt in step_tickets_api:
-    if re.match('[A-Z]+-[0-9]+', tkt.Text):
-        step_tickets.update({tkt.ForeignObjectId: tkt.Text})
+    try:
+        if re.match('[A-Z]+-[0-9]+', tkt.Text):
+            step_tickets.update({tkt.ForeignObjectId: tkt.Text})
+    except TypeError:
+        # type error might be caused by None values. ignore error.
+        pass
 
 # get all activities to sync
 request_data = {
@@ -99,7 +110,7 @@ steps = {}
 for sync in synched:
     # Get information about ACTIVITIES from ActivityService
     request_data = {
-        'Field': ['Name', 'Id', 'ProjectId'],
+        'Field': ['Name', 'Id', 'ProjectId', 'WBSName'],
         'Filter': "ObjectId = '%s'" % sync.ForeignObjectId} # replace this with check for JIRA import need
     activities_api = soap_request(request_data, primaserver, 'ActivityService', 'ReadActivities', primauser, primapasswd)
 
@@ -111,6 +122,7 @@ for sync in synched:
     activities.update({activities_api[0].ObjectId : {'ProjectId': activities_api[0].ProjectId,
                                        'Name': activities_api[0].Name,
                                        'Id': activities_api[0].Id,
+                                       'WBS': wbs_extractor(activities_api[0].WBSName),
                                        'Description': get_activity_scope(activities_api[0].ObjectId,
                                                                          primaserver, primauser, primapasswd)}})
     # Get information about STEPS from ActivityStepService
@@ -151,5 +163,5 @@ for act in activities:
                 pass
             else:
                 step_reqnum, step_jira_id = ju.create_ticket('jira-section', jcon.user, ticket=None, parent=reqnum,
-                                        summary=steps[step]['Name'], description=steps[step]['Name'], project='LSSTTST')
+                                        summary=steps[step]['Name'], description=steps[step]['Description'], project='LSSTTST')
                 resp = ticket_post(primauser, primapasswd, step, steps[step]['ProjectId'], step_jira_id, 329)

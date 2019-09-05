@@ -87,7 +87,7 @@ def create_subticket(con,dict):
         subticket = str(con.create_jira_subtask(dict['parent'],dict['summary'],
                                                  dict['description'],dict['jira_user']))
         reqnum = subticket.split('-')[1]
-        jira_id = dict['parent']
+        jira_id = subticket
         return (reqnum, jira_id)
 
 def create_ticket(jira_section, jira_user, ticket=None, parent=None, summary=None, description=None, use_existing=False,
