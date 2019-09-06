@@ -5,6 +5,7 @@ from zeep.wsse.username import UsernameToken
 import configparser
 import re
 import requests
+import shlog
 
 
 def ticket_post(user, pw, ForeignObjectId, ProjectObjectId, Text, UDFTypeObjectId):
@@ -47,6 +48,11 @@ def get_activity_scope(act_id, primaserver, user, pw):
     request_data = {
         'Field': ['RawTextNote'],
         'Filter': "ActivityObjectId = '%s' and NotebookTopicName = 'Scope'" % str(act_id)}
+    shlog_list = ''
+    for field in request_data['Field']:
+        shlog_list += field + ', '
+    shlog.verbose('Making Primavera ActivityNoteService request for the description of activity ActivityId #'
+                  + str(act_id) + ', fields: ' + shlog_list[:-2])
     act_note_api = soap_request(request_data, primaserver, 'ActivityNoteService', 'ReadActivityNotes', user, pw)
     if len(act_note_api) == 0:
         return None
@@ -69,6 +75,19 @@ primadict=parser['primavera-section']
 primauser=primadict['user']
 primapasswd=primadict['passwd']
 primaserver=primadict['server']
+# read jira info for verbose output
+jiradict=parser['jira-section']
+jiraproject = jiradict['project']
+# read tool config
+tool_dict = parser['tool-settings']
+tool_log = tool_dict['loglevel']
+loglevel=shlog.__dict__[tool_log]
+assert type(loglevel) == type(1)
+shlog.basicConfig(level=shlog.__dict__[tool_log])
+shlog.verbose('Primavera connection will use:\nServer: ' + primaserver +
+              '\nUser: ' + primauser + '\nPass: ' + '*'*len(primapasswd))
+
+
 # init jira and primavera connections
 jcon = Jira('jira-section')
 
@@ -77,6 +96,10 @@ jcon = Jira('jira-section')
 request_data = {
     'Field': ['ForeignObjectId', 'Text'],
     'Filter': "UDFTypeTitle = 'LSST Jira Mapping'"}
+shlog_list = ''
+for field in request_data['Field']:
+    shlog_list += field + ', '
+shlog.verbose('Making Primavera request to get all activities with recorded Epics, fields: ' + shlog_list[:-2])
 tickets_api = soap_request(request_data, primaserver, 'UDFValueService', 'ReadUDFValues', primauser, primapasswd)
 # create a dict with activity -> ticket relations
 tickets = {}
@@ -88,6 +111,10 @@ for tkt in tickets_api:
 request_data = {
     'Field': ['ForeignObjectId', 'Text'],
     'Filter': "UDFTypeTitle = 'LSST JIRA ID'"}
+shlog_list = ''
+for field in request_data['Field']:
+    shlog_list += field + ', '
+shlog.verbose('Making Primavera request to get all steps with recorded Stories, fields: ' + shlog_list[:-2])
 step_tickets_api = soap_request(request_data, primaserver, 'UDFValueService', 'ReadUDFValues', primauser, primapasswd)
 # create a dict with step -> ticket relations
 step_tickets = {}
@@ -103,6 +130,11 @@ for tkt in step_tickets_api:
 request_data = {
     'Field': ['Indicator','ForeignObjectId'],
     'Filter': "UDFTypeTitle = 'Import into JIRA' and Indicator = 'Green'"}
+shlog_list = ''
+for field in request_data['Field']:
+    shlog_list += field + ', '
+shlog.verbose('Making Primavera request to get all activities with a '
+              'green checkmark ready for export, fields: ' + shlog_list[:-2])
 synched = soap_request(request_data, primaserver, 'UDFValueService', 'ReadUDFValues', primauser, primapasswd)
 
 activities = {}
@@ -111,12 +143,15 @@ for sync in synched:
     # Get information about ACTIVITIES from ActivityService
     request_data = {
         'Field': ['Name', 'Id', 'ProjectId', 'WBSName'],
-        'Filter': "ObjectId = '%s'" % sync.ForeignObjectId} # replace this with check for JIRA import need
+        'Filter': "ObjectId = '%s'" % sync.ForeignObjectId}
+    shlog_list = ''
+    for field in request_data['Field']:
+        shlog_list += field + ', '
+    shlog.verbose('Making Primavera ActivityService request for ActivityId #' + str(sync.ForeignObjectId) + ', fields: ' + shlog_list[:-2])
     activities_api = soap_request(request_data, primaserver, 'ActivityService', 'ReadActivities', primauser, primapasswd)
 
-    # TODO: fix this unnesessary loop
     if len(activities_api) > 1:
-        print('activities_api returned ' + str(len(activities_api)) + 'results!')
+        shlog.normal('\nFATAL ERROR: activities_api returned ' + str(len(activities_api)) + 'results!')
         exit(0)
 
     activities.update({activities_api[0].ObjectId : {'ProjectId': activities_api[0].ProjectId,
@@ -130,7 +165,13 @@ for sync in synched:
     request_data = {
         'Field': ['ActivityObjectId', 'ObjectId', 'Name', 'Description', 'ProjectId'],
         'Filter': "ActivityObjectId = '%s'" % activities_api[0].ObjectId}
+    shlog_list = ''
+    for field in request_data['Field']:
+        shlog_list += field + ', '
+    shlog.verbose('Making Primavera ActivityStepService request for all steps of activity ActivityId #'
+                  + str(sync.ForeignObjectId) + ', fields: ' + shlog_list[:-2])
     steps_api = soap_request(request_data, primaserver, 'ActivityStepService', 'ReadActivitySteps', primauser, primapasswd)
+    shlog.verbose('Found ' + str(len(steps_api)) + ' steps')
     for step in steps_api:
         steps.update({step.ObjectId: {'ActivityObjectId': step.ActivityObjectId,
                                       'Name': step.Name,
@@ -143,10 +184,14 @@ for sync in synched:
 # This is the Jira section
 for act in activities:
     # this will not create duplicates because of a check
+    shlog.normal('Making a request to file a new JIRA Epic or find existing for activity #' + str(act) + ' with:\n'
+                 'Name/Summary: ' + activities[act]['Name'] + '\nDescription: ' + activities[act]['Description']
+                 + '\nProject: ' + jiraproject)
     reqnum, jira_id = ju.create_ticket('jira-section', jcon.user, ticket=None, parent=None,
                                        summary=activities[act]['Name'],
-                                       description=activities[act]['Description'], use_existing=True, project='LSSTTST',
+                                       description=activities[act]['Description'], use_existing=True, project=jiraproject,
                                        prima_code=activities[act]['Id'])
+    shlog.normal('Returned JIRA ticket ' + jira_id)
     if act in tickets.keys():
         # if the ticket already exists, update name etc
         # TODO: put sync logic here
@@ -154,6 +199,7 @@ for act in activities:
         pass
     else:
         # post if the lsst id needs to be entered
+        shlog.normal('Transmitting JIRA ID ' + jira_id + ' back to activity ' + str(act))
         resp = ticket_post(primauser, primapasswd, act, activities[act]['ProjectId'], jira_id, 130)
     # go through steps of the activity in question and create their tickets
     for step in steps:
@@ -162,6 +208,12 @@ for act in activities:
                 # TODO: add sync here
                 pass
             else:
+                shlog.normal(
+                    'Making a request to file a new JIRA story or find existing for step #' + str(step) + ' with:\n'
+                     'Name/Summary: ' + steps[step]['Name'] + '\nDescription: ' + steps[step]['Description']
+                    + '\nProject: ' + jiraproject + '\nParent: ' + jira_id)
                 step_reqnum, step_jira_id = ju.create_ticket('jira-section', jcon.user, ticket=None, parent=reqnum,
                                         summary=steps[step]['Name'], description=steps[step]['Description'], project='LSSTTST')
+                shlog.normal('Returned JIRA ticket ' + step_jira_id)
                 resp = ticket_post(primauser, primapasswd, step, steps[step]['ProjectId'], step_jira_id, 329)
+                shlog.normal('Transmitting JIRA ID ' + step_jira_id + ' back to activity ' + str(step))

@@ -1,0 +1,16 @@
+# This file should be named 'login' without an extension and contain your login info
+# Keep this file in a secure location!
+
+[jira-section]
+project = LSSTTST
+user = ekimtcov.v@gmail.com
+passwd = pass
+server = https://jira.ncsa.illinois.edu
+
+[primavera-section]
+user = ekimtcov
+passwd = pass
+server = https://uofi-stage-p6.oracleindustry.com
+
+[tool-settings]
+loglevel = VERBOSE

@@ -6,6 +6,17 @@ import os
 import sys
 from jira.client import JIRA
 import configparser
+import shlog
+
+# init logger
+parser = configparser.ConfigParser()
+with open('login') as configfile:
+    parser.read_file(configfile)
+tool_dict = parser['tool-settings']
+tool_log = tool_dict['loglevel']
+loglevel=shlog.__dict__[tool_log]
+assert type(loglevel) == type(1)
+shlog.basicConfig(level=shlog.__dict__[tool_log])
 
 class Jira:
     def __init__(self,section):
@@ -20,6 +31,8 @@ class Jira:
         self.jira = jira
         self.server = jiraserver
         self.user = jirauser
+        shlog.verbose('JIRA connection will use:\nServer: ' + jiraserver +
+                      '\nUser: ' + jirauser + '\nPass: ' + '*'*len(jirapasswd))
 
     def search_for_issue(self,summary):
         jql = 'summary ~ "\\"%s\\""' % (summary)
@@ -69,3 +82,4 @@ class Jira:
 
     def add_jira_comment(self,issue,comment):
         self.jira.add_comment(issue,comment)
+
