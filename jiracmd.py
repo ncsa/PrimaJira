@@ -7,6 +7,8 @@ import sys
 from jira.client import JIRA
 import configparser
 import shlog
+from datetime import datetime
+
 
 # init logger
 parser = configparser.ConfigParser()
@@ -39,18 +41,18 @@ class Jira:
         issue = self.jira.search_issues(jql)
         count = len(issue)
         return (issue,count)
- 
+
     def search_for_parent(self,project,summary):
         jql = 'project = "%s" and summary ~ "%s"' % (project, summary)
         issue = self.jira.search_issues(jql)
         count = len(issue)
         return (issue,count)
-   
+
     def get_issue(self,key):
         issue_info = self.jira.issue(key)
         return issue_info
 
-    def create_jira_subtask(self,parent,summary,description,assignee):
+    def create_jira_subtask(self,parent,summary,description,assignee,spoints=None):
         try:
             parent_issue = self.jira.issue(parent)
         except:
@@ -64,21 +66,25 @@ class Jira:
 		    'issuetype':{'name':'Story'},
 		    'description': description,
 		    'customfield_10536': parent_issue.key, # this is the epic link
-		    'assignee':{'name': assignee}
+		    'assignee':{'name': assignee},
+            'customfield_10532': spoints
 		    }
         subtask = self.jira.create_issue(fields=subtask_dict)
-        return subtask.key	
+        return subtask.key
 
-    def create_jira_ticket(self,project,summary,description,assignee):
+    def create_jira_ticket(self,project,summary,description,assignee, wbs=None, start=None, due=None):
         ticket_dict = {'project':{'key':project},
-		    'customfield_10537': summary, # THIS MIGHT (READ: DOES 100%) CHANGE IN DIFFERENT JIRA INSTANCES
+		    'customfield_10537': summary,  # THIS MIGHT (READ: DOES 100%) CHANGE IN DIFFERENT JIRA INSTANCES
             'summary': summary,
 		    'issuetype':{'name':'Epic'},
 		    'description': description,
-		    'assignee':{'name': assignee}
-		    }	
+		    'assignee':{'name': assignee},
+            'customfield_13234': wbs,
+            'customfield_10630': start.strftime("%Y-%m-%d"),
+            'duedate': due.strftime("%Y-%m-%d")
+		    }
         ticket = self.jira.create_issue(fields=ticket_dict)
-        return ticket.key	
+        return ticket.key
 
     def add_jira_comment(self,issue,comment):
         self.jira.add_comment(issue,comment)

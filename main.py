@@ -120,7 +120,7 @@ def get_steps_activities(synched, server, user, passw):
     for sync in synched:
         # Get information about ACTIVITIES from ActivityService
         request_data = {
-            'Field': ['Name', 'Id', 'ProjectId', 'WBSName'],
+            'Field': ['Name', 'Id', 'ProjectId', 'WBSName', 'FinishDate', 'StartDate'],
             'Filter': "ObjectId = '%s'" % sync.ForeignObjectId}
         shlog_list = ''
         for field in request_data['Field']:
@@ -137,13 +137,15 @@ def get_steps_activities(synched, server, user, passw):
                                                         'Name': activities_api[0].Name,
                                                         'Id': activities_api[0].Id,
                                                         'WBS': wbs_extractor(activities_api[0].WBSName),
+                                                        'Start': activities_api[0].StartDate,
+                                                        'Due': activities_api[0].FinishDate,
                                                         'Description': get_activity_scope(activities_api[0].ObjectId,
                                                                                           server, user,
                                                                                           passw)}})
         # Get information about STEPS from ActivityStepService
         # only needed steps are retrieved to save traffic and execution time
         request_data = {
-            'Field': ['ActivityObjectId', 'ObjectId', 'Name', 'Description', 'ProjectId'],
+            'Field': ['ActivityObjectId', 'ObjectId', 'Name', 'Description', 'ProjectId', 'Weight'],
             'Filter': "ActivityObjectId = '%s'" % activities_api[0].ObjectId}
         shlog_list = ''
         for field in request_data['Field']:
@@ -156,7 +158,8 @@ def get_steps_activities(synched, server, user, passw):
             steps.update({step.ObjectId: {'ActivityObjectId': step.ActivityObjectId,
                                           'Name': step.Name,
                                           'Description': step.Description,
-                                          'ProjectId': step.ProjectId
+                                          'ProjectId': step.ProjectId,
+                                          'Weight': step.Weight
                                           }})
     return activities, steps
 
@@ -203,12 +206,13 @@ if __name__ == '__main__':
     for act in activities:
         # this will not create duplicates because of a check
         shlog.normal('Making a request to file a new JIRA Epic or find existing for activity #' + str(act) + ' with:\n'
-                     'Name/Summary: ' + activities[act]['Name'] + '\nDescription: ' + activities[act]['Description']
-                     + '\nProject: ' + jiraproject)
+                     'Name/Summary: ' + str(activities[act]['Name']) + '\nDescription: ' +
+                     str(activities[act]['Description']) + '\nProject: ' + str(jiraproject))
         reqnum, jira_id = ju.create_ticket('jira-section', jcon.user, ticket=None, parent=None,
                                            summary=activities[act]['Name'],
                                            description=activities[act]['Description'], use_existing=True, project=jiraproject,
-                                           prima_code=activities[act]['Id'])
+                                           prima_code=activities[act]['Id'], WBS=activities[act]['WBS'],
+                                           start=activities[act]['Start'], due=activities[act]['Due'])
         shlog.normal('Returned JIRA ticket ' + jira_id)
         if act in tickets.keys():
             # if the ticket already exists, update name etc
@@ -228,10 +232,11 @@ if __name__ == '__main__':
                 else:
                     shlog.normal(
                         'Making a request to file a new JIRA story or find existing for step #' + str(step) + ' with:\n'
-                         'Name/Summary: ' + steps[step]['Name'] + '\nDescription: ' + steps[step]['Description']
-                        + '\nProject: ' + jiraproject + '\nParent: ' + jira_id)
+                         'Name/Summary: ' + str(steps[step]['Name']) + '\nDescription: ' + str(steps[step]['Description'])
+                        + '\nProject: ' + str(jiraproject) + '\nParent: ' + jira_id)
                     step_reqnum, step_jira_id = ju.create_ticket('jira-section', jcon.user, ticket=None, parent=reqnum,
-                                            summary=steps[step]['Name'], description=steps[step]['Description'], project='LSSTTST')
+                                            summary=steps[step]['Name'], description=steps[step]['Description'],
+                                            project='LSSTTST', spoints=steps[step]['Weight'])
                     shlog.normal('Returned JIRA ticket ' + step_jira_id)
                     resp = ticket_post(primaserver, primauser, primapasswd, step, steps[step]['ProjectId'], step_jira_id, 329)
                     shlog.normal('Transmitting JIRA ID ' + step_jira_id + ' back to activity ' + str(step))

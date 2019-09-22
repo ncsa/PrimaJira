@@ -69,7 +69,8 @@ def use_existing_ticket(con,dict):
         jira_id = issues[0].key
         return (reqnum,jira_id)
     else:
-        new_story = str(con.create_jira_ticket('LSSTTST', dict['summary'], dict['description'], dict['jira_user']))
+        new_story = str(con.create_jira_ticket('LSSTTST', dict['summary'], dict['description'], dict['jira_user'],
+                                               wbs=dict['wbs'], start=dict['start'], due=dict['due']))
         reqnum = new_story.split('-')[1]
         jira_id = new_story
         return (reqnum,jira_id)
@@ -85,13 +86,13 @@ def create_subticket(con,dict):
         return (reqnum, jira_id)
     else:
         subticket = str(con.create_jira_subtask(dict['parent'],dict['summary'],
-                                                 dict['description'],dict['jira_user']))
+                                                 dict['description'],dict['jira_user'], spoints=dict['spoints']))
         reqnum = subticket.split('-')[1]
         jira_id = subticket
         return (reqnum, jira_id)
 
 def create_ticket(jira_section, jira_user, ticket=None, parent=None, summary=None, description=None, use_existing=False,
-                  project='LSSTTST', prima_code=None):
+                  project='LSSTTST', prima_code=None, WBS=None, start=None, due=None, spoints=None):
     """ Create a JIRA ticket for use in framework processing. If parent is specified,
     will create a subticket. If ticket is specified, will use that ticket. If no parent is specified,
     will create the ticket as a story. Parent and ticket
@@ -100,7 +101,7 @@ def create_ticket(jira_section, jira_user, ticket=None, parent=None, summary=Non
     args_dict = {'jira_section':jira_section,'jira_user':jira_user,
                  'parent':parent,'ticket':ticket,'summary':summary,
                  'description':description,'use_existing':use_existing,
-                 'project':project}
+                 'project':project,'wbs':WBS,'start':start,'due':due,'spoints':spoints}
     if parent and ticket:
         pass
     else:
