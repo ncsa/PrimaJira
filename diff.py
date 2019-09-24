@@ -5,6 +5,15 @@ import shlog
 import configparser
 import jira_utils as ju
 from jiracmd import Jira
+import jira
+
+
+def get_primavera_step_count(ActivityId, server, user, passw):
+    request_data = {
+        'Field': ['ObjectId'],
+        'Filter': "ActivityObjectId = '%s'" % ActivityId}
+    steps_api = m.soap_request(request_data, server, 'ActivityStepService', 'ReadActivitySteps', user, passw)
+    return len(steps_api)
 
 
 # read config and get primavera login info
@@ -29,6 +38,7 @@ shlog.verbose('Primavera connection will use:\nServer: ' + primaserver +
 # init jira stuff
 jcon = Jira('jira-section')
 con = ju.get_con('jira-section')
+
 
 shlog.verbose('Getting ticket IDs and activities due for export')
 tickets = m.get_activity_tickets(primaserver, primauser, primapasswd)
@@ -78,54 +88,72 @@ for act in activities:
     if count == 1:
         # find cases where there is a properly named ticket, but no ticket entry
         if not(tickets.get(act, False)):
-            shlog.normal('Ticket with name ' + activities[act]['Name'] + ' exists, but Activity ID #' + str(act) + ' does not '
-                         'have a ticket record. Please add the record manually, or check if activities with '
+            shlog.normal('Ticket with name "' + activities[act]['Name'] + '" exists, but Activity ID #' + str(act) +
+                         ' does not have a ticket record. Please add the record manually, or check if activities with '
                          'duplicate names exist')
         # find ticket records mismatches
         if str(tickets.get(act, issues[0].key)) != str(issues[0].key):
-            shlog.normal('Activity ' + activities[act]['Name'] + ' has ticket listed as ' + tickets.get(act, False) +
+            shlog.normal('Activity "' + activities[act]['Name'] + '" has ticket listed as ' + tickets.get(act, False) +
                          ' in Primavera but JIRA returned ticket ' + issues[0].key + '. Please update the record in '
                                                                                      'Primavera if necessary.')
     if count > 1:
-        shlog.normal('More than one ticket exist with name ' + activities[act]['Name'] + ':')
+        shlog.normal('More than one ticket exist with name "' + activities[act]['Name'] + '":')
         for issue in issues:
             shlog.normal(issue.key)
         shlog.normal('Please resolve duplicate tickets')
+
+    try:
+        jira_tix = con.get_issue(tickets[act])
+        j_stories, j_count = con.search_for_children(jiraproject,jira_tix)
+        p_steps = get_primavera_step_count(act, primaserver, primauser, primapasswd)
+        if count != p_steps:
+            shlog.normal('JIRA reported ' + str(j_count) + ' Stories for Epic "' + activities[act]['Name'] + '", '
+                         'however Primavera reported ' + str(p_steps) + ' steps for the same activity. Please check'
+                         ' for steps that had not been imported or other issues.')
+    except jira.exceptions.JIRAError:
+        # this usually happens if a ticket does not exist. it's already handled earlier in the code
+        pass
 
 shlog.normal('\n---CHECKING FOR STEPS IMPORTED IMPROPERLY---')
 for step in steps:
     issues, count = con.search_for_issue(steps[step]['Name'])
     # find steps with IDs without a corresponding ticket (different names?)
     if count == 0:
-        shlog.normal('Could not find Step "' + steps[step]['Name'] + '" in JIRA')
+        shlog.normal('Could not find Step "' + steps[step]['Name'] + '" (Activity: "' +
+                     activities[int(steps[step]['ActivityObjectId'])]['Name'] + '") in JIRA')
         # find unsyched tickets
         if step not in step_tickets.keys():
-            shlog.normal('"' + steps[step]['Name'] + '" does not yet have an associated JIRA ID. '
-                                                         'main.py can create a ticket automatically')
+            shlog.normal('"' + steps[step]['Name'] + '" (Activity: "' +
+                         activities[int(steps[step]['ActivityObjectId'])]['Name'] + '") does not yet have an '
+                         'associated JIRA ID. main.py can create a ticket automatically')
         else:
-            shlog.normal('"' + steps[step]['Name'] + '" already has a JIRA ID associated with it (' + step_tickets[step] +')')
+            shlog.normal('"' + steps[step]['Name'] + '" (Activity: "' +
+                         activities[int(steps[step]['ActivityObjectId'])]['Name'] + '") already has a JIRA ID '
+                         'associated with it (' + step_tickets[step] + ')')
             # what will this do
             try:
                 # if this suceeds, then the name needs to be synched manually
                 jira_tix = con.get_issue(step_tickets[step])
-                shlog.normal('Ticket ' + str(jira_tix) +  " already exists. Please check if it's technically the same "
+                shlog.normal('Ticket ' + str(jira_tix) + " already exists. Please check if it's technically the same "
                                                           "ticket and make the correction manually")
             except:
                 # if this fails or returns nothing, then the issue needs to be created
-                shlog.normal('The specified ticket ' + step_tickets[step] + ' does not exist. Please fix the JIRA ID record '
-                                                                      'and/or have the main program create the ticket')
+                shlog.normal('The specified ticket ' + step_tickets[step] + ' does not exist. Please fix the JIRA ID '
+                             'record and/or have the main program create the ticket')
 
     if count == 1:
         # find cases where there is a properly named ticket, but no ticket entry
         if not(step_tickets.get(step, False)):
-            shlog.normal('Ticket with name ' + steps[step]['Name'] + ' exists, but Step ID #' + str(step) + ' does not '
-                         'have a ticket record. Please add the record manually, or check if steps with '
-                         'duplicate names exist')
+            shlog.normal('Ticket with name "' + steps[step]['Name'] + '" (Activity: "' +
+                         activities[int(steps[step]['ActivityObjectId'])]['Name'] + '") exists, but Step ID #' +
+                         str(step) + ' does not have a ticket record. Please add the record manually, or check if '
+                         'steps with duplicate names exist')
         # find ticket records mismatches
         if str(step_tickets.get(step, issues[0].key)) != str(issues[0].key):
-            shlog.normal('Step ' + steps[step]['Name'] + ' has ticket listed as ' + step_tickets.get(step, False) +
-                         ' in Primavera but JIRA returned ticket ' + issues[0].key + '. Please update the record in '
-                                                                                     'Primavera if necessary.')
+            shlog.normal('Step "' + steps[step]['Name'] + '" (Activity: "' +
+                         activities[int(steps[step]['ActivityObjectId'])]['Name'] + '") has ticket listed as ' +
+                         step_tickets.get(step, False) + ' in Primavera but JIRA returned ticket ' + issues[0].key +
+                         '. Please update the record in Primavera if necessary.')
     if count > 1:
         shlog.normal('More than one ticket exist with name ' + steps[step]['Name'] + ':')
         for issue in issues:
@@ -134,5 +162,7 @@ for step in steps:
 
     # check story pts mismatch
     if int(issues[0].fields.customfield_10532) != int(steps[step]['Weight']):
-        shlog.normal('Step ' + steps[step]['Name'] + ' reported ' + str(issues[0].fields.customfield_10532) +
-                     ' story points in JIRA, but ' + str(steps[step]['Weight']) + ' weight in Primavera')
+        shlog.normal('Step "' + steps[step]['Name'] + '" (Activity: "' +
+                     activities[int(steps[step]['ActivityObjectId'])]['Name'] + '") reported ' +
+                     str(issues[0].fields.customfield_10532) + ' story points in JIRA, but ' +
+                     str(steps[step]['Weight']) + ' weight in Primavera')

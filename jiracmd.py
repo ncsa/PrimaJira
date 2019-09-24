@@ -36,8 +36,11 @@ class Jira:
         shlog.verbose('JIRA connection will use:\nServer: ' + jiraserver +
                       '\nUser: ' + jirauser + '\nPass: ' + '*'*len(jirapasswd))
 
-    def search_for_issue(self,summary):
-        jql = 'summary ~ "\\"%s\\""' % (summary)
+    def search_for_issue(self,summary,parent=None):
+        if parent:
+            jql = 'summary ~ "\\"%s\\"" and "Epic Link" = "%s"' % (summary, parent)
+        else:
+            jql = 'summary ~ "\\"%s\\""' % (summary)
         issue = self.jira.search_issues(jql)
         count = len(issue)
         return (issue,count)
@@ -47,6 +50,12 @@ class Jira:
         issue = self.jira.search_issues(jql)
         count = len(issue)
         return (issue,count)
+
+    def search_for_children(self,project,parent):
+        jql = 'project = "%s" and "Epic Link" = "%s"' % (project, parent)
+        issue = self.jira.search_issues(jql)
+        count = len(issue)
+        return (issue, count)
 
     def get_issue(self,key):
         issue_info = self.jira.issue(key)

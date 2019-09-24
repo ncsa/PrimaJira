@@ -239,4 +239,4 @@ if __name__ == '__main__':
                                             project='LSSTTST', spoints=steps[step]['Weight'])
                     shlog.normal('Returned JIRA ticket ' + step_jira_id)
                     resp = ticket_post(primaserver, primauser, primapasswd, step, steps[step]['ProjectId'], step_jira_id, 329)
-                    shlog.normal('Transmitting JIRA ID ' + step_jira_id + ' back to activity ' + str(step))
+                    shlog.normal('Transmitting JIRA ID ' + step_jira_id + ' back to step ' + str(step))

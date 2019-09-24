@@ -78,7 +78,7 @@ def use_existing_ticket(con,dict):
 def create_subticket(con,dict):
     """Takes a JIRA connection object and a dictionary and creates a
        subticket. Returns the reqnum,jira_id"""
-    issues, count = con.search_for_issue(dict['summary'])
+    issues, count = con.search_for_issue(dict['summary'], dict['parent'])
     if count != 0:
         # If a subticket with this exact name exists, we can just use it
         reqnum = str(issues[0].key).split('-')[1]
