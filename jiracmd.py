@@ -81,7 +81,7 @@ class Jira:
         subtask = self.jira.create_issue(fields=subtask_dict)
         return subtask.key
 
-    def create_jira_ticket(self,project,summary,description,assignee, wbs=None, start=None, due=None):
+    def create_jira_ticket(self,project,summary,description,assignee, wbs=None, start=None, due=None, spoints=None):
         ticket_dict = {'project':{'key':project},
 		    'customfield_10537': summary,  # THIS MIGHT (READ: DOES 100%) CHANGE IN DIFFERENT JIRA INSTANCES
             'summary': summary,
@@ -90,7 +90,8 @@ class Jira:
 		    'assignee':{'name': assignee},
             'customfield_13234': wbs,
             'customfield_10630': start.strftime("%Y-%m-%d"),
-            'duedate': due.strftime("%Y-%m-%d")
+            'duedate': due.strftime("%Y-%m-%d"),
+            'customfield_10532': spoints
 		    }
         ticket = self.jira.create_issue(fields=ticket_dict)
         return ticket.key

@@ -169,7 +169,8 @@ for step in steps:
         shlog.normal('More than one ticket exists with name ' + steps[step]['Name'] + ':')
         for issue in issues:
             shlog.normal(issue.key)
-        shlog.normal('Please resolve duplicate tickets')
+        shlog.normal('Please resolve duplicate tickets\nThis issue is normally ignored unless issues exist with parent '
+                     'ticket')
 
     # check story pts mismatch
     if count != 0 and int(issues[0].fields.customfield_10532) != int(steps[step]['Weight']):

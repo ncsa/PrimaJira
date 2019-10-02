@@ -70,7 +70,8 @@ def use_existing_ticket(con,dict):
         return (reqnum,jira_id)
     else:
         new_story = str(con.create_jira_ticket('LSSTTST', dict['summary'], dict['description'], dict['jira_user'],
-                                               wbs=dict['wbs'], start=dict['start'], due=dict['due']))
+                                               wbs=dict['wbs'], start=dict['start'], due=dict['due'],
+                                               spoints=dict['spoints']))
         reqnum = new_story.split('-')[1]
         jira_id = new_story
         return (reqnum,jira_id)

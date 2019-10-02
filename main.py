@@ -170,6 +170,21 @@ def wbs_extractor(raw):
         return None
 
 
+def step_list_filter(steps, ActivityID):
+    output = {}
+    for step in steps:
+        if steps[step]['ActivityObjectId'] == ActivityID:
+            output[step] = steps[step]
+    return output
+
+
+def get_total_hours(steps):
+    pts = 0
+    for step in steps:
+        pts += steps[step]['Weight']
+    return pts
+
+
 # read config
 parser = configparser.ConfigParser()
 with open('login') as configfile:
@@ -204,6 +219,9 @@ if __name__ == '__main__':
     # At this point, we have everything to export from Primavera
     # This is the Jira section
     for act in activities:
+        # pre-handle steps to get total story points
+        activity_steps = step_list_filter(steps, act)
+        points = get_total_hours(activity_steps)
         # this will not create duplicates because of a check
         shlog.normal('Making a request to file a new JIRA Epic or find existing for activity #' + str(act) + ' with:\n'
                      'Name/Summary: ' + str(activities[act]['Name']) + '\nDescription: ' +
@@ -212,7 +230,7 @@ if __name__ == '__main__':
                                            summary=activities[act]['Name'],
                                            description=activities[act]['Description'], use_existing=True, project=jiraproject,
                                            prima_code=activities[act]['Id'], WBS=activities[act]['WBS'],
-                                           start=activities[act]['Start'], due=activities[act]['Due'])
+                                           start=activities[act]['Start'], due=activities[act]['Due'], spoints=points)
         shlog.normal('Returned JIRA ticket ' + jira_id)
         if act in tickets.keys():
             # if the ticket already exists, update name etc
@@ -224,19 +242,18 @@ if __name__ == '__main__':
             shlog.normal('Transmitting JIRA ID ' + jira_id + ' back to activity ' + str(act))
             resp = ticket_post(primaserver, primauser, primapasswd, act, activities[act]['ProjectId'], jira_id, 130)
         # go through steps of the activity in question and create their tickets
-        for step in steps:
-            if steps[step]['ActivityObjectId'] == act:
-                if step in step_tickets.keys():
-                    # TODO: add sync here
-                    pass
-                else:
-                    shlog.normal(
-                        'Making a request to file a new JIRA story or find existing for step #' + str(step) + ' with:\n'
-                         'Name/Summary: ' + str(steps[step]['Name']) + '\nDescription: ' + str(steps[step]['Description'])
-                        + '\nProject: ' + str(jiraproject) + '\nParent: ' + jira_id)
-                    step_reqnum, step_jira_id = ju.create_ticket('jira-section', jcon.user, ticket=None, parent=reqnum,
-                                            summary=steps[step]['Name'], description=steps[step]['Description'],
-                                            project='LSSTTST', spoints=steps[step]['Weight'])
-                    shlog.normal('Returned JIRA ticket ' + step_jira_id)
-                    resp = ticket_post(primaserver, primauser, primapasswd, step, steps[step]['ProjectId'], step_jira_id, 329)
-                    shlog.normal('Transmitting JIRA ID ' + step_jira_id + ' back to step ' + str(step))
+        for step in activity_steps:
+            if step in step_tickets.keys():
+                # TODO: add sync here
+                pass
+            else:
+                shlog.normal(
+                    'Making a request to file a new JIRA story or find existing for step #' + str(step) + ' with:\n'
+                     'Name/Summary: ' + str(steps[step]['Name']) + '\nDescription: ' + str(steps[step]['Description'])
+                    + '\nProject: ' + str(jiraproject) + '\nParent: ' + jira_id)
+                step_reqnum, step_jira_id = ju.create_ticket('jira-section', jcon.user, ticket=None, parent=reqnum,
+                                        summary=steps[step]['Name'], description=steps[step]['Description'],
+                                        project='LSSTTST', spoints=steps[step]['Weight'])
+                shlog.normal('Returned JIRA ticket ' + step_jira_id)
+                resp = ticket_post(primaserver, primauser, primapasswd, step, steps[step]['ProjectId'], step_jira_id, 329)
+                shlog.normal('Transmitting JIRA ID ' + step_jira_id + ' back to step ' + str(step))
