@@ -73,8 +73,12 @@ def get_activity_tickets(server, user, passw):
     # create a dict with activity -> ticket relations
     tickets = {}
     for tkt in tickets_api:
-        if re.match('[A-Z]+-[0-9]+', tkt.Text):
-            tickets.update({tkt.ForeignObjectId: tkt.Text})
+        try:
+            if re.match('[A-Z]+-[0-9]+', tkt.Text):
+                tickets.update({tkt.ForeignObjectId: tkt.Text})
+        except TypeError:
+            # caused by "None" values
+            pass
     return tickets
 
 
@@ -226,7 +230,7 @@ if __name__ == '__main__':
         shlog.normal('Making a request to file a new JIRA Epic or find existing for activity #' + str(act) + ' with:\n'
                      'Name/Summary: ' + str(activities[act]['Name']) + '\nDescription: ' +
                      str(activities[act]['Description']) + '\nProject: ' + str(jiraproject))
-        reqnum, jira_id = ju.create_ticket('jira-section', jcon.user, ticket=None, parent=None,
+        reqnum, jira_id = ju.create_ticket('jira-section', None, ticket=None, parent=None,
                                            summary=activities[act]['Name'],
                                            description=activities[act]['Description'], use_existing=True, project=jiraproject,
                                            prima_code=activities[act]['Id'], WBS=activities[act]['WBS'],
@@ -251,9 +255,9 @@ if __name__ == '__main__':
                     'Making a request to file a new JIRA story or find existing for step #' + str(step) + ' with:\n'
                      'Name/Summary: ' + str(steps[step]['Name']) + '\nDescription: ' + str(steps[step]['Description'])
                     + '\nProject: ' + str(jiraproject) + '\nParent: ' + jira_id)
-                step_reqnum, step_jira_id = ju.create_ticket('jira-section', jcon.user, ticket=None, parent=reqnum,
+                step_reqnum, step_jira_id = ju.create_ticket('jira-section', None, ticket=None, parent=reqnum,
                                         summary=steps[step]['Name'], description=steps[step]['Description'],
-                                        project='LSSTTST', spoints=steps[step]['Weight'])
+                                        project='DM', spoints=steps[step]['Weight'])
                 shlog.normal('Returned JIRA ticket ' + step_jira_id)
-                resp = ticket_post(primaserver, primauser, primapasswd, step, steps[step]['ProjectId'], step_jira_id, 329)
+                resp = ticket_post(primaserver, primauser, primapasswd, step, steps[step]['ProjectId'], step_jira_id, 149)
                 shlog.normal('Transmitting JIRA ID ' + step_jira_id + ' back to step ' + str(step))

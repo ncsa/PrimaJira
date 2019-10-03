@@ -173,8 +173,8 @@ for step in steps:
                      'ticket')
 
     # check story pts mismatch
-    if count != 0 and int(issues[0].fields.customfield_10532) != int(steps[step]['Weight']):
+    if count != 0 and int(issues[0].fields.customfield_10202) != int(steps[step]['Weight']):
         shlog.normal('Step "' + steps[step]['Name'] + '" (Activity: "' +
                      activities[parent_activity]['Name'] + '") reported ' +
-                     str(issues[0].fields.customfield_10532) + ' story points in JIRA, but ' +
+                     str(issues[0].fields.customfield_10202) + ' story points in JIRA, but ' +
                      str(steps[step]['Weight']) + ' weight in Primavera')
