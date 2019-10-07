@@ -29,12 +29,14 @@ class Jira:
         jirauser=jiradict['user']
         jirapasswd=jiradict['passwd']
         jiraserver=jiradict['server']
+        jiraproject = jiradict['project']
         jira=JIRA(options={'server':jiraserver},basic_auth=(jirauser,jirapasswd))
         self.jira = jira
         self.server = jiraserver
         self.user = jirauser
+        self.project = jiraproject
         shlog.verbose('JIRA connection will use:\nServer: ' + jiraserver +
-                      '\nUser: ' + jirauser + '\nPass: ' + '*'*len(jirapasswd))
+                      '\nUser: ' + jirauser + '\nPass: ' + '*'*len(jirapasswd) + '\nProject: ' + jiraproject)
 
     def search_for_issue(self,summary,parent=None):
         if parent:
@@ -69,30 +71,55 @@ class Jira:
             print(warning)
             sys.exit()
 
-        subtask_dict = {'project':{'key':parent_issue.fields.project.key},
-		    'summary': summary,
-            # change the issue type if needed
-		    'issuetype':{'name':'Story'},
-		    'description': description,
-		    'customfield_10206': parent_issue.key, # this is the epic link
-		    'assignee':{'name': assignee},
-            'customfield_10202': spoints
-		    }
+        if 'ncsa' in self.server.lower():
+            subtask_dict = {'project': {'key': parent_issue.fields.project.key},
+                            'summary': summary,
+                            # change the issue type if needed
+                            'issuetype': {'name': 'Story'},
+                            'description': description,
+                            'customfield_10536': parent_issue.key,  # this is the epic link
+                            'assignee': {'name': assignee},
+                            'customfield_10532': spoints
+                            }
+        if 'lsst' in self.server.lower():
+            subtask_dict = {'project':{'key':parent_issue.fields.project.key},
+                            'summary': summary,
+                            # change the issue type if needed
+                            'issuetype':{'name':'Story'},
+                            'description': description,
+                            'customfield_10206': parent_issue.key, # this is the epic link
+                            'assignee':{'name': assignee},
+                            'customfield_10202': spoints
+                            }
         subtask = self.jira.create_issue(fields=subtask_dict)
         return subtask.key
 
     def create_jira_ticket(self,project,summary,description,assignee, wbs=None, start=None, due=None, spoints=None):
-        ticket_dict = {'project':{'key':project},
-		    'customfield_10207': summary,  # THIS MIGHT (READ: DOES 100%) CHANGE IN DIFFERENT JIRA INSTANCES
-            'summary': summary,
-		    'issuetype':{'name':'Epic'},
-		    'description': description,
-		    'assignee':{'name': assignee},
-            'customfield_10500': wbs,
-            'customfield_11303': start.strftime("%Y-%m-%d"),
-            'customfield_11304': due.strftime("%Y-%m-%d"),
-            'customfield_10202': spoints
-		    }
+        if 'ncsa' in self.server.lower():
+            ticket_dict = {'project': {'key': project},
+                           'customfield_10537': summary,
+                           # THIS MIGHT (READ: DOES 100%) CHANGE IN DIFFERENT JIRA INSTANCES
+                           'summary': summary,
+                           'issuetype': {'name': 'Epic'},
+                           'description': description,
+                           'assignee': {'name': assignee},
+                           # 'customfield_13234': wbs,
+                           'customfield_10630': start.strftime("%Y-%m-%d"),
+                           'customfield_11930': due.strftime("%Y-%m-%d"),
+                           'customfield_10532': spoints
+                           }
+        if 'lsst' in self.server.lower():
+            ticket_dict = {'project':{'key':project},
+                           'customfield_10207': summary,  # THIS MIGHT (READ: DOES 100%) CHANGE IN DIFFERENT JIRA INSTANCES
+                           'summary': summary,
+                           'issuetype':{'name':'Epic'},
+                           'description': description,
+                           'assignee':{'name': assignee},
+                           'customfield_10500': wbs,
+                           'customfield_11303': start.strftime("%Y-%m-%d"),
+                           'customfield_11304': due.strftime("%Y-%m-%d"),
+                           'customfield_10202': spoints
+                           }
         ticket = self.jira.create_issue(fields=ticket_dict)
         return ticket.key
 

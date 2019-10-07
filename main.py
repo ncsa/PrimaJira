@@ -60,11 +60,16 @@ def get_activity_scope(act_id, primaserver, user, pw):
         return act_note_api[0]['RawTextNote']
 
 
-def get_activity_tickets(server, user, passw):
+def get_activity_tickets(server, user, passw, serv):
     # Get all activity -> ticket field records
-    request_data = {
-        'Field': ['ForeignObjectId', 'Text'],
-        'Filter': "UDFTypeTitle = 'LSST Jira Mapping'"}
+    if 'ncsa' in serv.lower():
+        request_data = {
+            'Field': ['ForeignObjectId', 'Text'],
+            'Filter': "UDFTypeTitle = 'NCSA Jira Mapping'"}
+    if 'lsst' in serv.lower():
+        request_data = {
+            'Field': ['ForeignObjectId', 'Text'],
+            'Filter': "UDFTypeTitle = 'LSST Jira Mapping'"}
     shlog_list = ''
     for field in request_data['Field']:
         shlog_list += field + ', '
@@ -82,11 +87,16 @@ def get_activity_tickets(server, user, passw):
     return tickets
 
 
-def get_step_tickets(server, user, passw):
+def get_step_tickets(server, user, passw, serv):
     # Get all step -> ticket field records
-    request_data = {
-        'Field': ['ForeignObjectId', 'Text'],
-        'Filter': "UDFTypeTitle = 'LSST JIRA ID'"}
+    if 'ncsa' in serv.lower():
+        request_data = {
+            'Field': ['ForeignObjectId', 'Text'],
+            'Filter': "UDFTypeTitle = 'NCSA JIRA ID'"}
+    if 'lsst' in serv.lower():
+        request_data = {
+            'Field': ['ForeignObjectId', 'Text'],
+            'Filter': "UDFTypeTitle = 'LSST JIRA ID'"}
     shlog_list = ''
     for field in request_data['Field']:
         shlog_list += field + ', '
@@ -104,11 +114,16 @@ def get_step_tickets(server, user, passw):
     return step_tickets
 
 
-def get_synched_activities(servr, user, passw):
+def get_synched_activities(servr, user, passw, jiraserv):
     # get all activities to sync
-    request_data = {
-        'Field': ['Indicator', 'ForeignObjectId'],
-        'Filter': "UDFTypeTitle = 'Import into JIRA' and Indicator = 'Green'"}
+    if 'ncsa' in jiraserv.lower():
+        request_data = {
+            'Field': ['Indicator', 'ForeignObjectId'],
+            'Filter': "UDFTypeTitle = 'Import into NCSA JIRA' and Indicator = 'Green'"}
+    if 'lsst' in jiraserv.lower():
+        request_data = {
+            'Field': ['Indicator', 'ForeignObjectId'],
+            'Filter': "UDFTypeTitle = 'Import into LSST JIRA' and Indicator = 'Green'"}
     shlog_list = ''
     for field in request_data['Field']:
         shlog_list += field + ', '
@@ -214,9 +229,9 @@ if __name__ == '__main__':
     # init jira connection
     jcon = Jira('jira-section')
 
-    tickets = get_activity_tickets(primaserver, primauser, primapasswd)
-    step_tickets = get_step_tickets(primaserver, primauser, primapasswd)
-    synched = get_synched_activities(primaserver, primauser, primapasswd)
+    tickets = get_activity_tickets(primaserver, primauser, primapasswd, jcon.server)
+    step_tickets = get_step_tickets(primaserver, primauser, primapasswd, jcon.server)
+    synched = get_synched_activities(primaserver, primauser, primapasswd, jcon.server)
     activities, steps = get_steps_activities(synched, primaserver, primauser, primapasswd)
 
 
@@ -229,10 +244,10 @@ if __name__ == '__main__':
         # this will not create duplicates because of a check
         shlog.normal('Making a request to file a new JIRA Epic or find existing for activity #' + str(act) + ' with:\n'
                      'Name/Summary: ' + str(activities[act]['Name']) + '\nDescription: ' +
-                     str(activities[act]['Description']) + '\nProject: ' + str(jiraproject))
+                     str(activities[act]['Description']) + '\nProject: ' + str(jcon.project))
         reqnum, jira_id = ju.create_ticket('jira-section', None, ticket=None, parent=None,
                                            summary=activities[act]['Name'],
-                                           description=activities[act]['Description'], use_existing=True, project=jiraproject,
+                                           description=activities[act]['Description'], use_existing=True, project=jcon.project,
                                            prima_code=activities[act]['Id'], WBS=activities[act]['WBS'],
                                            start=activities[act]['Start'], due=activities[act]['Due'], spoints=points)
         shlog.normal('Returned JIRA ticket ' + jira_id)
@@ -243,8 +258,12 @@ if __name__ == '__main__':
             pass
         else:
             # post if the lsst id needs to be entered
+            if 'ncsa' in jcon.server.lower():
+                code = 139
+            if 'lsst' in jcon.server.lower():
+                code = 130
             shlog.normal('Transmitting JIRA ID ' + jira_id + ' back to activity ' + str(act))
-            resp = ticket_post(primaserver, primauser, primapasswd, act, activities[act]['ProjectId'], jira_id, 130)
+            resp = ticket_post(primaserver, primauser, primapasswd, act, activities[act]['ProjectId'], jira_id, code)
         # go through steps of the activity in question and create their tickets
         for step in activity_steps:
             if step in step_tickets.keys():
@@ -254,10 +273,14 @@ if __name__ == '__main__':
                 shlog.normal(
                     'Making a request to file a new JIRA story or find existing for step #' + str(step) + ' with:\n'
                      'Name/Summary: ' + str(steps[step]['Name']) + '\nDescription: ' + str(steps[step]['Description'])
-                    + '\nProject: ' + str(jiraproject) + '\nParent: ' + jira_id)
+                    + '\nProject: ' + str(jcon.project) + '\nParent: ' + jira_id)
                 step_reqnum, step_jira_id = ju.create_ticket('jira-section', None, ticket=None, parent=reqnum,
                                         summary=steps[step]['Name'], description=steps[step]['Description'],
-                                        project='DM', spoints=steps[step]['Weight'])
+                                        project=jcon.project, spoints=steps[step]['Weight'])
                 shlog.normal('Returned JIRA ticket ' + step_jira_id)
-                resp = ticket_post(primaserver, primauser, primapasswd, step, steps[step]['ProjectId'], step_jira_id, 149)
+                if 'ncsa' in jcon.server.lower():
+                    code = 151
+                if 'lsst' in jcon.server.lower():
+                    code = 149
+                resp = ticket_post(primaserver, primauser, primapasswd, step, steps[step]['ProjectId'], step_jira_id, code)
                 shlog.normal('Transmitting JIRA ID ' + step_jira_id + ' back to step ' + str(step))

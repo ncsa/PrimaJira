@@ -16,26 +16,6 @@ def get_con(jira_section, retry = 3,sleep = 15):
             time.sleep(sleep)
             print "JIRA Connection Error...Retry #{num}".format(num=num_retries)
 
-def does_comment_exist(con,reqnum=None):
-        key= "DM-%s" % reqnum
-        jira_tix = con.get_issue(key)
-        all_comments = jira_tix.fields.comment.comments
-        if len(all_comments) == 0:
-            return False
-        else:
-            return True
-
-def make_comment(con,datetime=None,content='',reqnum=None,attempt=None):
-        """ Comment given jiraticket when auto-submitted"""
-        comment = """Submit started at %s
-                     -----
-                     %s""" % (datetime,content)
-        key= "DM-%s" % reqnum
-        jira_tix = con.get_issue(key)
-        all_comments = jira_tix.fields.comment.comments
-        con.add_jira_comment(key,comment)
-        return (comment,len(all_comments))
-
 def get_jira_user(section='jira-desdm',services_file=None):
     Config = ConfigParser.ConfigParser()
     if not services_file:
@@ -47,21 +27,13 @@ def get_jira_user(section='jira-desdm',services_file=None):
     except:
         return os.environ['USER']
 
-def get_reqnum_from_nite(parent,nite):
-    """Used for auto-submit for firstcut. If nite exists under parent, grab the reqnum to be used in resubmit_failed."""
-    con = get_con('jira-desdm')
-    parent = 'DM-' + str(parent)
-    issues, count = con.search_for_issue(nite)
-    if count != 0:
-        reqnum = str(issues[0].key).split('-')[1]
-        jira_id = issues[0].fields.parent.key
-        return reqnum
-    else:
-        return None
 
 def use_existing_ticket(con,dict):
     """Looks to see if JIRA ticket exists. If it does it will use it instead
        of creating a new ticket. Returns reqnum,jira_id"""
+    Config = ConfigParser.ConfigParser()
+    Config.read('login')
+    jiraproject = Config.get('jira-section', 'project')
     issues,count = con.search_for_issue(dict['summary'])
     if count != 0:
         # If the epic with this exact name exists, we can just use it
@@ -69,7 +41,7 @@ def use_existing_ticket(con,dict):
         jira_id = issues[0].key
         return (reqnum,jira_id)
     else:
-        new_story = str(con.create_jira_ticket('DM', dict['summary'], dict['description'], dict['jira_user'],
+        new_story = str(con.create_jira_ticket(jiraproject, dict['summary'], dict['description'], dict['jira_user'],
                                                wbs=dict['wbs'], start=dict['start'], due=dict['due'],
                                                spoints=dict['spoints']))
         reqnum = new_story.split('-')[1]
@@ -93,7 +65,7 @@ def create_subticket(con,dict):
         return (reqnum, jira_id)
 
 def create_ticket(jira_section, jira_user, ticket=None, parent=None, summary=None, description=None, use_existing=False,
-                  project='DM', prima_code=None, WBS=None, start=None, due=None, spoints=None):
+                  project=None, prima_code=None, WBS=None, start=None, due=None, spoints=None):
     """ Create a JIRA ticket for use in framework processing. If parent is specified,
     will create a subticket. If ticket is specified, will use that ticket. If no parent is specified,
     will create the ticket as a story. Parent and ticket
