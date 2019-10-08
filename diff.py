@@ -27,6 +27,7 @@ primaserver=primadict['server']
 # read jira info for verbose output
 jiradict=parser['jira-section']
 jiraproject = jiradict['project']
+jiraserver=jiradict['server']
 # read tool config
 tool_dict = parser['tool-settings']
 tool_log = tool_dict['loglevel']
@@ -34,16 +35,16 @@ loglevel=shlog.__dict__[tool_log]
 assert type(loglevel) == type(1)
 shlog.basicConfig(level=shlog.__dict__[tool_log])
 shlog.verbose('Primavera connection will use:\nServer: ' + primaserver +
-              '\nUser: ' + primauser + '\nPass: ' + '*'*len(primapasswd))# init jira connection
+              '\nUser: ' + primauser + '\nPass: ' + '*'*len(primapasswd) + '\nProject: ' + jiraproject)
 # init jira stuff
 jcon = Jira('jira-section')
 con = ju.get_con('jira-section')
 
 
 shlog.verbose('Getting ticket IDs and activities due for export')
-tickets = m.get_activity_tickets(primaserver, primauser, primapasswd)
-step_tickets = m.get_step_tickets(primaserver, primauser, primapasswd)
-synched = m.get_synched_activities(primaserver, primauser, primapasswd)
+tickets = m.get_activity_tickets(primaserver, primauser, primapasswd, jiraserver)
+step_tickets = m.get_step_tickets(primaserver, primauser, primapasswd, jiraserver)
+synched = m.get_synched_activities(primaserver, primauser, primapasswd, jiraserver)
 activities, steps = m.get_steps_activities(synched, primaserver, primauser, primapasswd)
 
 # find activities not yet imported
@@ -96,6 +97,24 @@ for act in activities:
             shlog.normal('Activity "' + activities[act]['Name'] + '" has ticket listed as ' + tickets.get(act, False) +
                          ' in Primavera but JIRA returned ticket ' + issues[0].key + '. Please update the record in '
                                                                                      'Primavera if necessary.')
+        # find total step story points not adding up to the ticket record
+        # pre-handle steps to get total story points
+        activity_steps = m.step_list_filter(steps, act)
+        p_points = m.get_total_hours(activity_steps)
+        try:
+            if 'ncsa' in jiraserver.lower():
+                j_points = int(issues[0].fields.customfield_10532)
+            if 'lsst' in jiraserver.lower():
+                j_points = int(issues[0].fields.customfield_10202)
+        except TypeError:
+            # caused by field not existing
+            j_points = 0
+        if j_points != p_points:
+            shlog.normal('Activity "' + activities[act]['Name'] + '" has ' + str(p_points) + ' total Story Points '
+                         'in Primavera, but JIRA reported ' + str(j_points) + '. Please check for steps not yet '
+                         'exported and changes to the Story Points field in JIRA')
+
+
     if count > 1:
         shlog.normal('More than one ticket exist with name "' + activities[act]['Name'] + '":')
         for issue in issues:
@@ -173,8 +192,21 @@ for step in steps:
                      'ticket')
 
     # check story pts mismatch
-    if count != 0 and int(issues[0].fields.customfield_10202) != int(steps[step]['Weight']):
+    mismatch = False
+    try:
+        if 'ncsa' in jiraserver.lower():
+            mismatch = (int(issues[0].fields.customfield_10532) != int(steps[step]['Weight']))
+        if 'lsst' in jiraserver.lower():
+            mismatch = (int(issues[0].fields.customfield_10202) != int(steps[step]['Weight']))
+    except:
+        # this fails due to count being zero
+        pass
+    if count != 0 and mismatch:
+        if 'ncsa' in jiraserver.lower():
+            jirapts = str(issues[0].fields.customfield_10532)
+        if 'lsst' in jiraserver.lower():
+            jirapts = str(issues[0].fields.customfield_10202)
         shlog.normal('Step "' + steps[step]['Name'] + '" (Activity: "' +
                      activities[parent_activity]['Name'] + '") reported ' +
-                     str(issues[0].fields.customfield_10202) + ' story points in JIRA, but ' +
+                     jirapts + ' story points in JIRA, but ' +
                      str(steps[step]['Weight']) + ' weight in Primavera')
