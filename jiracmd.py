@@ -126,3 +126,13 @@ class Jira:
     def add_jira_comment(self,issue,comment):
         self.jira.add_comment(issue,comment)
 
+    def list_links(self,issue):
+        return self.jira.remote_links(issue)
+
+    def add_external_link(self,issue,link,title=None):
+        if not title:
+            title = issue
+        self.jira.add_simple_link(issue, {'url':link,'title':title})
+
+
+

@@ -135,3 +135,14 @@ def create_ticket(jira_section, jira_user, ticket=None, parent=None, summary=Non
         #     else:
         #         reqnum,jira_id = create_subticket(con,args_dict)
         #         return (reqnum,jira_id)
+
+def link_second_jira(con,local_issue,remote_issue,remote_server):
+    """Check if the remote issue had been linked, and if not, create a new link"""
+    link_list = con.list_links(local_issue)
+    already_linked = False
+    for link in link_list:
+        if remote_issue in link.object.url:
+            already_linked = True
+    if not already_linked:
+        url = remote_server + '/browse/' + remote_issue
+        con.add_external_link(local_issue, url, remote_issue)
