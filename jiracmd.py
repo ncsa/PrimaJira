@@ -148,6 +148,18 @@ class Jira:
         else:
             return False
 
+    def check_if_reopened(self,project,issue):
+        jql = 'project = "%s" and id = "%s" and status  = "Reopened"' % (project, issue)
+        try:
+            count = len(self.jira.search_issues(jql))
+        except jira.exceptions.JIRAError:
+            # see:
+            # https://jira.atlassian.com/browse/JRASERVER-23287?focusedCommentId=220596&page=com.atlassian.jira.plugin.system.issuetabpanels%3Acomment-tabpanel#comment-220596
+            count = 0
+        if count > 0:
+            return True
+        else:
+            return False
 
 
 

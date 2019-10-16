@@ -6,7 +6,7 @@ from jiracmd import Jira
 import requests
 
 
-def post_step_complete(server, user, pw, ObjectId):
+def post_step_complete(server, user, pw, ObjectId, complete=True):
     url = server + '/p6ws/services/ActivityStepService?wsdl'
     body = """<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:v1="http://xmlns.oracle.com/Primavera/P6/WS/UDFValue/V1">
        <soapenv:Header>
@@ -21,13 +21,13 @@ def post_step_complete(server, user, pw, ObjectId):
           <v1:UpdateActivitySteps>
              <v1:ActivityStep>
                 <v1:ObjectId>%s</v1:ObjectId>
-                <v1:IsCompleted>True</v1:IsCompleted>
+                <v1:IsCompleted>%s</v1:IsCompleted>
              </v1:ActivityStep>
           </v1:UpdateActivitySteps>
        </soapenv:Body>
-    </soapenv:Envelope>""" % (user, pw, ObjectId)
+    </soapenv:Envelope>""" % (user, pw, ObjectId, str(complete))
 
-    shlog.normal('Posting Step ID ' + str(ObjectId) + ' as complete to Primavera server ' + server)
+    shlog.normal('Post Step ID ' + str(ObjectId) + ' Complete as ' + str(complete) + ' to Primavera server ' + server)
     response = requests.post(url, data=body)
     return response.content
 
@@ -59,11 +59,17 @@ step_tickets = m.get_step_tickets(primaserver, primauser, primapasswd, jcon.serv
 # loop through step -> ticket records
 for step in step_tickets:
     closed = jcon.check_if_closed(jcon.project, step_tickets[step])
+    reopened = jcon.check_if_reopened(jcon.project, step_tickets[step])
+    info = m.get_step_info(step, primaserver, primauser, primapasswd)
     if closed:
-        info = m.get_step_info(step, primaserver, primauser, primapasswd)
         shlog.normal('\nREPORTED AS CLOSED\nStep ID: ' + str(step) +
                      '\nStep Name: ' + info['Name'])
         shlog.verbose('\nParent Activity: ' + info['ActivityName'] +
                       '\nJIRA Story: ' + step_tickets[step])
         resp = post_step_complete(primaserver, primauser, primapasswd, step)
-
+    if reopened:
+        shlog.normal('\nREPORTED AS REOPENED\nStep ID: ' + str(step) +
+                     '\nStep Name: ' + info['Name'])
+        shlog.verbose('\nParent Activity: ' + info['ActivityName'] +
+                      '\nJIRA Story: ' + step_tickets[step])
+        resp = post_step_complete(primaserver, primauser, primapasswd, step, False)
