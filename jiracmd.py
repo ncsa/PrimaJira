@@ -8,6 +8,7 @@ from jira.client import JIRA
 import configparser
 import shlog
 from datetime import datetime
+import jira
 
 
 # init logger
@@ -133,6 +134,20 @@ class Jira:
         if not title:
             title = issue
         self.jira.add_simple_link(issue, {'url':link,'title':title})
+
+    def check_if_closed(self,project,issue):
+        jql = 'project = "%s" and id = "%s" and status  = "Closed"' % (project, issue)
+        try:
+            count = len(self.jira.search_issues(jql))
+        except jira.exceptions.JIRAError:
+            # see:
+            # https://jira.atlassian.com/browse/JRASERVER-23287?focusedCommentId=220596&page=com.atlassian.jira.plugin.system.issuetabpanels%3Acomment-tabpanel#comment-220596
+            count = 0
+        if count > 0:
+            return True
+        else:
+            return False
+
 
 
 

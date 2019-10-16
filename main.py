@@ -204,6 +204,24 @@ def get_total_hours(steps):
     return pts
 
 
+def get_step_info(stepid, primaserver, primauser, primapasswd):
+    request_data = {
+        'Field': ['ActivityId', 'ActivityName', 'Name'],
+        'Filter': "ObjectId = '%s'" % stepid}
+    api_resp = soap_request(request_data, primaserver, 'ActivityStepService', 'ReadActivitySteps', primauser,
+                                    primapasswd)
+
+    try:
+        out = {'ActivityId':api_resp[0].ActivityId,
+               'ActivityName':api_resp[0].ActivityName,
+               'Name':api_resp[0].Name}
+    except IndexError:
+        out = {'ActivityId':'0',
+               'ActivityName':'Error',
+               'Name':'Error'}
+    return out
+
+
 # read config
 parser = configparser.ConfigParser()
 with open('login') as configfile:
