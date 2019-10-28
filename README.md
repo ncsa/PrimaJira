@@ -8,6 +8,9 @@ Features code originally developed by Michael Johnson and Donald Petravick:
 
 Uses Python 2.7+
 
+VPN features require Cisco AnyConnect installed and use code by unode:
+* https://github.com/unode/panyc
+
 ## Use
 Fill out the fields specified in *login_sample* and rename the file to *login*. Check the activities to be exported in NCSA's Primavera. Run *main.py*. 
 

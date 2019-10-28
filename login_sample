@@ -12,5 +12,12 @@ user = ekimtcov
 passwd = pass
 server = https://uofi-stage-p6.oracleindustry.com
 
+[vpn-section]
+host = vpn.cites.illinois.edu
+group = 3_TunnelAll
+login = ekimtco2
+password =
+post_cmd = touch postcmd.touch
+
 [tool-settings]
 loglevel = VERBOSE

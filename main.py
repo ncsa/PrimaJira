@@ -6,6 +6,12 @@ import configparser
 import re
 import requests
 import shlog
+from requests import Session
+from zeep.transports import Transport
+import requests
+# outta sign, outta mind
+requests.packages.urllib3.disable_warnings()
+import os
 
 
 def ticket_post(server, user, pw, ForeignObjectId, ProjectObjectId, Text, UDFTypeObjectId):
@@ -38,7 +44,10 @@ def ticket_post(server, user, pw, ForeignObjectId, ProjectObjectId, Text, UDFTyp
 def soap_request(request_data, primaserver, primaservice, servicereq, user, pw):
     # generic primavera soap requester
     wsdl_url = primaserver + '/p6ws/services/' + primaservice + '?wsdl'
-    soap_client = c.Client(wsdl_url, wsse=UsernameToken(user, pw))
+    session = Session()
+    session.verify = False
+    transport = Transport(session=session)
+    soap_client = c.Client(wsdl_url, transport=transport, wsse=UsernameToken(user, pw))
     with soap_client.settings(raw_response=False):
         api_response = getattr(soap_client.service, servicereq)(**request_data)
     return api_response
@@ -220,6 +229,20 @@ def get_step_info(stepid, primaserver, primauser, primapasswd):
                'ActivityName':'Error',
                'Name':'Error'}
     return out
+
+
+def vpn_toggle(switch):
+    """issue an OS command to toggle AnyConnect VPN
+
+    :param switch: bool
+    :return: None
+    """
+    if switch:
+        shlog.normal('Engaging VPN...')
+        os.system('cat login | ./panyc.py connect -')
+    if not switch:
+        shlog.normal('Disabling VPN...')
+        os.system('python3 panyc.py disconnect; killall -9 vpn')
 
 
 # read config
