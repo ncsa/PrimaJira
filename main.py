@@ -14,31 +14,51 @@ requests.packages.urllib3.disable_warnings()
 import os
 
 
+def xmlpost(url, user, pw, ComplexType, element, RequestCore):
+    body = """<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:v1="http://xmlns.oracle.com/Primavera/P6/WS/UDFValue/V1">
+               <soapenv:Header>
+                <wsse:Security xmlns:wsse="http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-secext-1.0.xsd">
+                  <wsse:UsernameToken>
+                    <wsse:Username>%s</wsse:Username>
+                    <wsse:Password Type="http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-username-token-profile-1.0#PasswordText">%s</wsse:Password>
+                  </wsse:UsernameToken>
+                </wsse:Security>
+              </soapenv:Header>
+               <soapenv:Body>
+                  <v1:%s>
+                     <v1:%s>
+                        %s
+                     </v1:%s>
+                  </v1:%s>
+               </soapenv:Body>
+            </soapenv:Envelope>""" % (user, pw, ComplexType, element, RequestCore, element, ComplexType)
+
+    shlog.verbose('Making request to url ' + url)
+    shlog.verbose('Request body: ' + body.replace(pw, '*'*len(pw)))
+    response = requests.post(url, verify=False, data=body)
+    shlog.verbose('Server response: ' + response.content)
+    return response
+
+
 def ticket_post(server, user, pw, ForeignObjectId, ProjectObjectId, Text, UDFTypeObjectId):
     url = server + '/p6ws/services/UDFValueService?wsdl'
-    body = """<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:v1="http://xmlns.oracle.com/Primavera/P6/WS/UDFValue/V1">
-       <soapenv:Header>
-        <wsse:Security xmlns:wsse="http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-secext-1.0.xsd">
-          <wsse:UsernameToken>
-            <wsse:Username>%s</wsse:Username>
-            <wsse:Password Type="http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-username-token-profile-1.0#PasswordText">%s</wsse:Password>
-          </wsse:UsernameToken>
-        </wsse:Security>
-      </soapenv:Header>
-       <soapenv:Body>
-          <v1:CreateUDFValues>
-             <v1:UDFValue>
-                <v1:ForeignObjectId>%s</v1:ForeignObjectId>
-                <v1:ProjectObjectId>%s</v1:ProjectObjectId>
-                <v1:Text>%s</v1:Text>
-                <v1:UDFTypeObjectId>%s</v1:UDFTypeObjectId>
-             </v1:UDFValue>
-          </v1:CreateUDFValues>
-       </soapenv:Body>
-    </soapenv:Envelope>""" % (user, pw, ForeignObjectId, ProjectObjectId, Text, UDFTypeObjectId)
+    core = """<v1:ForeignObjectId>%s</v1:ForeignObjectId>
+              <v1:ProjectObjectId>%s</v1:ProjectObjectId>
+              <v1:Text>%s</v1:Text>
+              <v1:UDFTypeObjectId>%s</v1:UDFTypeObjectId>""" % (ForeignObjectId, ProjectObjectId, Text, UDFTypeObjectId)
 
-    response = requests.post(url, data=body)
+    response = xmlpost(url, user, pw, 'CreateUDFValues', 'UDFValue', core)
     return response.content
+
+
+def ticket_wipe(server, user, pw, ForeignObjectId, UDFTypeObjectId):
+    request_data = {'ObjectId': {'UDFTypeObjectId': str(UDFTypeObjectId),
+                                 'ForeignObjectId': str(ForeignObjectId)}}
+    shlog.verbose('Making DeleteUDFValues request for UDFTypeObjectId ' + str(UDFTypeObjectId) + ',  ForeignObjectId ' +
+                  str(ForeignObjectId))
+    response = soap_request(request_data, server, 'UDFValueService', 'DeleteUDFValues', user, pw)
+    shlog.verbose('Server response: ' + str(response))
+    return response
 
 
 def soap_request(request_data, primaserver, primaservice, servicereq, user, pw):
@@ -51,6 +71,7 @@ def soap_request(request_data, primaserver, primaservice, servicereq, user, pw):
     with soap_client.settings(raw_response=False):
         api_response = getattr(soap_client.service, servicereq)(**request_data)
     return api_response
+
 
 def get_activity_scope(act_id, primaserver, user, pw):
     # attempt to retrieve the scope notebook record of the activity

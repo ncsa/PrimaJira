@@ -15,6 +15,20 @@ def get_primavera_step_count(ActivityId, server, user, passw):
     steps_api = m.soap_request(request_data, server, 'ActivityStepService', 'ReadActivitySteps', user, passw)
     return len(steps_api)
 
+def fix_it(error_code):
+    if error_code == 1:
+        # code 1 is Activity JIRA ID present, but ticket doesn't exist
+        shlog.normal('Suggested resolution: delete the ticket record from the Activity')
+    if error_code == 2:
+        shlog.normal('Suggested resolution: delete the ticket record from the Step')
+    shlog.normal('Proceed? [y/n]')
+    choice = raw_input()
+    choice = choice.lower()
+    if choice == 'y':
+        return True
+    else:
+        return False
+
 
 # read config and get primavera login info
 parser = configparser.ConfigParser()
@@ -27,6 +41,11 @@ primaserver=primadict['server']
 # read tool config
 tool_dict = parser['tool-settings']
 tool_log = tool_dict['loglevel']
+tool_fixer = tool_dict['fix']
+if tool_fixer.lower() in ['true', '1', 't', 'y', 'yes', 'yeah', 'yup', 'certainly', 'uh-huh']:
+    tool_fixer = True
+else:
+    tool_fixer = False
 loglevel=shlog.__dict__[tool_log]
 assert type(loglevel) == type(1)
 shlog.basicConfig(level=shlog.__dict__[tool_log])
@@ -35,7 +54,7 @@ shlog.verbose('Primavera connection will use:\nServer: ' + primaserver +
 # init jira stuff
 con = ju.get_con('jira-section')
 
-
+m.vpn_toggle(True)
 shlog.verbose('Getting ticket IDs and activities due for export')
 tickets = m.get_activity_tickets(primaserver, primauser, primapasswd, con.server)
 step_tickets = m.get_step_tickets(primaserver, primauser, primapasswd, con.server)
@@ -63,7 +82,7 @@ for act in activities:
     issues, count = con.search_for_issue(activities[act]['Name'])
     # find steps with IDs without a corresponding ticket (different names?)
     if count == 0:
-        shlog.normal('Could not find Activity "' + activities[act]['Name'] + '" in JIRA')
+        shlog.normal('Could not find Activity "' + activities[act]['Name'] + '" in JIRA, ObjectID: ' + str(act))
         # find unsyched tickets
         if act not in tickets.keys():
             shlog.normal('"' + activities[act]['Name'] + '" does not yet have an associated JIRA ID. '
@@ -77,9 +96,16 @@ for act in activities:
                 shlog.normal('Ticket ' + str(jira_tix) +  " already exists. Please check if it's technically the same "
                                                           "ticket and make the correction manually")
             except:
-                # if this fails or returns nothing, then the issue needs to be created
-                shlog.normal('The specified ticket ' + tickets[act] + ' does not exist. Please fix the JIRA ID record '
+                # if this fails or returns nothing, then the record needs to be wiped
+                shlog.normal('The specified ticket ' + tickets[act] + ' does not exist. Please wipe the JIRA ID record '
                                                                       'and/or have the main program create the ticket')
+                if tool_fixer and fix_it(1):
+                    if 'ncsa' in con.server.lower():
+                        code = 139
+                    if 'lsst' in con.server.lower():
+                        code = 130
+                    m.ticket_wipe(primaserver, primauser, primapasswd, act, code)
+
 
     if count == 1:
         # find cases where there is a properly named ticket, but no ticket entry
@@ -145,7 +171,7 @@ for step in steps:
     # find steps with IDs without a corresponding ticket (different names?)
     if count == 0:
         shlog.normal('Could not find Step "' + steps[step]['Name'] + '" (Activity: "' +
-                     activities[parent_activity]['Name'] + '") in JIRA')
+                     activities[parent_activity]['Name'] + '") in JIRA, ObjectID: ' + str(act))
         # find unsyched tickets
         if step not in step_tickets.keys():
             shlog.normal('"' + steps[step]['Name'] + '" (Activity: "' +
@@ -165,6 +191,12 @@ for step in steps:
                 # if this fails or returns nothing, then the issue needs to be created
                 shlog.normal('The specified ticket ' + step_tickets[step] + ' does not exist. Please fix the JIRA ID '
                              'record and/or have the main program create the ticket')
+                if tool_fixer and fix_it(2):
+                    if 'ncsa' in con.server.lower():
+                        code = 151
+                    if 'lsst' in con.server.lower():
+                        code = 149
+                    m.ticket_wipe(primaserver, primauser, primapasswd, act, code)
 
     if count == 1:
         # find cases where there is a properly named ticket, but no ticket entry
@@ -205,3 +237,5 @@ for step in steps:
                      activities[parent_activity]['Name'] + '") reported ' +
                      jirapts + ' story points in JIRA, but ' +
                      str(steps[step]['Weight']) + ' weight in Primavera')
+
+m.vpn_toggle(False)
