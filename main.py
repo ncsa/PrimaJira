@@ -54,7 +54,7 @@ def ticket_post(server, user, pw, ForeignObjectId, ProjectObjectId, Text, UDFTyp
 def ticket_wipe(server, user, pw, ForeignObjectId, UDFTypeObjectId):
     request_data = {'ObjectId': {'UDFTypeObjectId': str(UDFTypeObjectId),
                                  'ForeignObjectId': str(ForeignObjectId)}}
-    shlog.verbose('Making DeleteUDFValues request for UDFTypeObjectId ' + str(UDFTypeObjectId) + ',  ForeignObjectId ' +
+    shlog.verbose('Making DeleteUDFValues request for UDFTypeObjectId ' + str(UDFTypeObjectId) + ', ForeignObjectId ' +
                   str(ForeignObjectId))
     response = soap_request(request_data, server, 'UDFValueService', 'DeleteUDFValues', user, pw)
     shlog.verbose('Server response: ' + str(response))

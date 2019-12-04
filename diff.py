@@ -171,7 +171,7 @@ for step in steps:
     # find steps with IDs without a corresponding ticket (different names?)
     if count == 0:
         shlog.normal('Could not find Step "' + steps[step]['Name'] + '" (Activity: "' +
-                     activities[parent_activity]['Name'] + '") in JIRA, ObjectID: ' + str(act))
+                     activities[parent_activity]['Name'] + '") in JIRA, ObjectID: ' + str(step))
         # find unsyched tickets
         if step not in step_tickets.keys():
             shlog.normal('"' + steps[step]['Name'] + '" (Activity: "' +
@@ -196,7 +196,7 @@ for step in steps:
                         code = 151
                     if 'lsst' in con.server.lower():
                         code = 149
-                    m.ticket_wipe(primaserver, primauser, primapasswd, act, code)
+                    m.ticket_wipe(primaserver, primauser, primapasswd, step, code)
 
     if count == 1:
         # find cases where there is a properly named ticket, but no ticket entry
