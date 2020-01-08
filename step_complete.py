@@ -28,7 +28,7 @@ def post_step_complete(server, user, pw, ObjectId, complete=True):
     </soapenv:Envelope>""" % (user, pw, ObjectId, str(complete))
 
     shlog.normal('Post Step ID ' + str(ObjectId) + ' Complete as ' + str(complete) + ' to Primavera server ' + server)
-    response = requests.post(url, data=body)
+    response = requests.post(url, verify=False, data=body)
     return response.content
 
 
@@ -54,6 +54,7 @@ shlog.verbose('Primavera connection will use:\nServer: ' + primaserver +
 # init jira stuff
 jcon = Jira('jira-section')
 
+m.vpn_toggle(True)
 step_tickets = m.get_step_tickets(primaserver, primauser, primapasswd, jcon.server)
 
 # loop through step -> ticket records
@@ -73,3 +74,5 @@ for step in step_tickets:
         shlog.verbose('\nParent Activity: ' + info['ActivityName'] +
                       '\nJIRA Story: ' + step_tickets[step])
         resp = post_step_complete(primaserver, primauser, primapasswd, step, False)
+
+m.vpn_toggle(False)

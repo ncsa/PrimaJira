@@ -12,6 +12,7 @@ import requests
 # outta sign, outta mind
 requests.packages.urllib3.disable_warnings()
 import os
+import datetime
 
 
 def xmlpost(url, user, pw, ComplexType, element, RequestCore):
@@ -166,24 +167,31 @@ def get_synched_activities(servr, user, passw, jiraserv):
 def get_steps_activities(synched, server, user, passw):
     activities = {}
     steps = {}
+    baseline = actual_baseline(server, user, passw)
     for sync in synched:
         # Get information about ACTIVITIES from ActivityService
         request_data = {
-            'Field': ['Name', 'Id', 'ProjectId', 'WBSName', 'FinishDate', 'StartDate'],
-            'Filter': "ObjectId = '%s'" % sync.ForeignObjectId}
+            'Field': ['Name', 'Id', 'ProjectId', 'WBSName', 'FinishDate', 'StartDate', 'ActivityOwnerUserId'],
+            'Filter': "ObjectId = '%s' and ProjectObjectId = '%d'" % (sync.ForeignObjectId, baseline)}
         shlog_list = ''
         for field in request_data['Field']:
             shlog_list += field + ', '
         shlog.verbose('Making Primavera ActivityService request for ActivityId #' + str(
-            sync.ForeignObjectId) + ', fields: ' + shlog_list[:-2])
+            sync.ForeignObjectId) + ', fields: ' + shlog_list[:-2] + ' @ BaselineID = ' + str(baseline))
         activities_api = soap_request(request_data, server, 'ActivityService', 'ReadActivities', user, passw)
 
         if len(activities_api) > 1:
             shlog.normal('\nFATAL ERROR: activities_api returned ' + str(len(activities_api)) + 'results!')
             exit(0)
+        if len(activities_api) == 0:
+            shlog.verbose('Synched Activity ObjectID ' + str(sync.ForeignObjectId) + ' is not present in Baseline ' +
+                          str(baseline) + ', skipping...')
+            continue
 
         activities.update({activities_api[0].ObjectId: {'ProjectId': activities_api[0].ProjectId,
                                                         'Name': activities_api[0].Name,
+                                                        'Owner': get_email(primaserver, primauser, primapasswd,
+                                                                           activities_api[0].ActivityOwnerUserId),
                                                         'Id': activities_api[0].Id,
                                                         'WBS': wbs_extractor(activities_api[0].WBSName),
                                                         'Start': activities_api[0].StartDate,
@@ -266,6 +274,55 @@ def vpn_toggle(switch):
         os.system('python3 panyc.py disconnect; killall -9 vpn')
 
 
+def actual_baseline(serv, usr, passw):
+    """Returns the ObjectID of the most recent and up-to-date baseline
+
+    :param serv: Primavera server
+    :param usr: P user
+    :param passw: P password
+    :return:
+    """
+    # request baseline data from the server
+    request_data = {'Field': ['DataDate', 'Name', 'ObjectId']}
+    response = soap_request(request_data, serv, 'BaselineProjectService', 'ReadBaselineProjects', usr, passw)
+    # convert response into a parseable dict
+    baselines = {}
+    for base in response:
+        baselines[base['ObjectId']] = {'Name' : base['Name'],
+                                       'Date' : base['DataDate']}
+    # find max value
+    most_recent = datetime.datetime(1990, 1, 1)
+    most_recent_obj = 0
+    most_recent_name = ''
+    for b in baselines.keys():
+        if baselines[b]['Date'] > most_recent:
+            most_recent = baselines[b]['Date']
+            most_recent_obj = b
+            most_recent_name = baselines[b]['Name']
+    shlog.verbose('Most recent ProjectObjectId/BaselineId identified as ' + str(most_recent_obj) + ', called ' +
+                  str(most_recent_name) + ' for date ' + str(most_recent))
+
+    return most_recent_obj  # test 408 495
+
+
+def get_email(serv, usr, passw, objectid):
+    """get username from activity owner
+
+    :param serv: P server
+    :param usr: P user
+    :param passw: P password
+    :param objectid: ID of activity object
+    :return: None or user
+    """
+    request_data = {'Field': ['EmailAddress'],
+                    'Filter': "ObjectId = '%s'" % objectid}
+    if objectid:  # if it's not None
+        synched = soap_request(request_data, serv, 'UserService', 'ReadUsers', usr, passw)
+        return synched[0]['EmailAddress'].split('@')[0]
+    else:
+        return None
+
+
 # read config
 parser = configparser.ConfigParser()
 with open('login') as configfile:
@@ -296,7 +353,8 @@ if __name__ == '__main__':
     synched = get_synched_activities(primaserver, primauser, primapasswd, jcon.server)
     activities, steps = get_steps_activities(synched, primaserver, primauser, primapasswd)
 
-
+    # pass
+    # exit(0) # A6830
     # At this point, we have everything to export from Primavera
     # This is the Jira section
     for act in activities:
@@ -307,9 +365,9 @@ if __name__ == '__main__':
         shlog.normal('Making a request to file a new JIRA Epic or find existing for activity #' + str(act) + ' with:\n'
                      'Name/Summary: ' + str(activities[act]['Name']) + '\nDescription: ' +
                      str(activities[act]['Description']) + '\nProject: ' + str(jcon.project))
-        reqnum, jira_id = ju.create_ticket('jira-section', None, ticket=None, parent=None,
-                                           summary=activities[act]['Name'],
-                                           description=activities[act]['Description'], use_existing=True, project=jcon.project,
+        reqnum, jira_id = ju.create_ticket('jira-section', activities[act]['Owner'], ticket=None, parent=None,
+                                           summary=activities[act]['Name'], description=activities[act]['Description'],
+                                           use_existing=True, project=jcon.project,
                                            prima_code=activities[act]['Id'], WBS=activities[act]['WBS'],
                                            start=activities[act]['Start'], due=activities[act]['Due'], spoints=points)
         shlog.normal('Returned JIRA ticket ' + jira_id)
