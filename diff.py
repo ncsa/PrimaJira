@@ -166,7 +166,7 @@ for step in steps:
         # JIRAError usually happens if a ticket does not exist. it's already handled earlier in the code
         # KeyError means that there's no ticket record in primavera. this is handled elsewhere
         # if any of these issues had caused an error, fall back to searching by name only
-        issues, count = con.search_for_issue(steps[step]['Name'])
+        issues, count = con.search_for_issue(steps[step]['Name'], name_only_search=True)
 
     # find steps with IDs without a corresponding ticket (different names?)
     if count == 0:

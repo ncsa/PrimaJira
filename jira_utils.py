@@ -43,7 +43,7 @@ def use_existing_ticket(con,dict):
     else:
         new_story = str(con.create_jira_ticket(jiraproject, dict['summary'], dict['description'], dict['jira_user'],
                                                wbs=dict['wbs'], start=dict['start'], due=dict['due'],
-                                               spoints=dict['spoints']))
+                                               spoints=dict['spoints'], team=dict['team']))
         reqnum = new_story.split('-')[1]
         jira_id = new_story
         return (reqnum,jira_id)
@@ -51,21 +51,22 @@ def use_existing_ticket(con,dict):
 def create_subticket(con,dict):
     """Takes a JIRA connection object and a dictionary and creates a
        subticket. Returns the reqnum,jira_id"""
-    issues, count = con.search_for_issue(dict['summary'], dict['parent'])
+    issues, count = con.search_for_issue(dict['summary'], parent=dict['parent'])
     if count != 0:
         # If a subticket with this exact name exists, we can just use it
         reqnum = str(issues[0].key).split('-')[1]
         jira_id = issues[0].key
         return (reqnum, jira_id)
     else:
-        subticket = str(con.create_jira_subtask(dict['parent'],dict['summary'],
-                                                 dict['description'],dict['jira_user'], spoints=dict['spoints']))
+        subticket = str(con.create_jira_subtask(dict['parent'],dict['summary'], dict['description'],
+                                                dict['jira_user'], spoints=dict['spoints'], team=dict['team']))
         reqnum = subticket.split('-')[1]
         jira_id = subticket
         return (reqnum, jira_id)
 
+
 def create_ticket(jira_section, jira_user, ticket=None, parent=None, summary=None, description=None, use_existing=False,
-                  project=None, prima_code=None, WBS=None, start=None, due=None, spoints=None):
+                  project=None, prima_code=None, WBS=None, start=None, due=None, spoints=None, team=None):
     """ Create a JIRA ticket for use in framework processing. If parent is specified,
     will create a subticket. If ticket is specified, will use that ticket. If no parent is specified,
     will create the ticket as a story. Parent and ticket
@@ -74,7 +75,7 @@ def create_ticket(jira_section, jira_user, ticket=None, parent=None, summary=Non
     args_dict = {'jira_section':jira_section,'jira_user':jira_user,
                  'parent':parent,'ticket':ticket,'summary':summary,
                  'description':description,'use_existing':use_existing,
-                 'project':project,'wbs':WBS,'start':start,'due':due,'spoints':spoints}
+                 'project':project,'wbs':WBS,'start':start,'due':due,'spoints':spoints,'team':team}
     if parent and ticket:
         pass
     else:

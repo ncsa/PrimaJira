@@ -27,6 +27,7 @@ if __name__ == '__main__':
     # init jira connection
     jcon = Jira('jira-section')
 
+    m.vpn_toggle(True)
     # get all NCSA activities and steps with green checkmarks
     synched = m.get_synched_activities(primaserver, primauser, primapasswd, 'https://jira.ncsa.illinois.edu')
     activities, steps = m.get_steps_activities(synched, primaserver, primauser, primapasswd)
@@ -58,3 +59,4 @@ if __name__ == '__main__':
                     # jira failures mean we can't sync anything
                     shlog.normal('Jira operation faled with error:')
                     print(e)
+    m.vpn_toggle(False)

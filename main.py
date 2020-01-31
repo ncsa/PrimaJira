@@ -2,6 +2,7 @@ import jira_utils as ju
 from jiracmd import Jira
 from zeep import client as c
 from zeep.wsse.username import UsernameToken
+from zeep.exceptions import *
 import configparser
 import re
 import requests
@@ -13,6 +14,8 @@ import requests
 requests.packages.urllib3.disable_warnings()
 import os
 import datetime
+import time
+import html2text as h
 
 
 def xmlpost(url, user, pw, ComplexType, element, RequestCore):
@@ -52,6 +55,34 @@ def ticket_post(server, user, pw, ForeignObjectId, ProjectObjectId, Text, UDFTyp
     return response.content
 
 
+def multi_ticket_post(server, user, pw, code, Id, jira_id, activity=True):
+    if activity:
+        # request all activities with the same ID
+        shlog.verbose('Making a request to find duplicates for activity Id ' + Id)
+        request_data = {'Field': ['ObjectId', 'ProjectObjectId'],
+                        'Filter': "Id = '%s'" % Id}
+        dupes = soap_request(request_data, server, 'ActivityService', 'ReadActivities', user, pw)
+    else:
+        # the step request goes off name, because there's no id
+        shlog.verbose('Making a request to find duplicates for step named ' + Id)
+        request_data = {'Field': ['ObjectId', 'ProjectObjectId'],
+                        'Filter': "Name = '%s'" % Id}
+        dupes = soap_request(request_data, server, 'ActivityStepService', 'ReadActivitySteps', user, pw)
+        if len(dupes) == 0:
+            shlog.normal('Critical error: Primavera returned no matches! This is caused by the activity name containing'
+                         ' single quotes. Please enter the Story ticket ID manually.')
+            return None
+    shlog.verbose('Primavera returned ' + str(len(dupes)) + ' duplicates')
+    # loop through all of the object ids
+    for entry in dupes:
+        # delete call
+        resp = ticket_wipe(server, user, pw, entry.ObjectId, code)
+        # post call
+        resp = ticket_post(server, user, pw, entry.ObjectId, entry.ProjectObjectId, jira_id, code)
+    return resp
+
+
+
 def ticket_wipe(server, user, pw, ForeignObjectId, UDFTypeObjectId):
     request_data = {'ObjectId': {'UDFTypeObjectId': str(UDFTypeObjectId),
                                  'ForeignObjectId': str(ForeignObjectId)}}
@@ -70,7 +101,20 @@ def soap_request(request_data, primaserver, primaservice, servicereq, user, pw):
     transport = Transport(session=session)
     soap_client = c.Client(wsdl_url, transport=transport, wsse=UsernameToken(user, pw))
     with soap_client.settings(raw_response=False):
-        api_response = getattr(soap_client.service, servicereq)(**request_data)
+        try:
+            api_response = getattr(soap_client.service, servicereq)(**request_data)
+        except Fault as error:
+            shlog.normal('SOAP request failed with the following:')
+            shlog.normal(error.message)
+            shlog.normal(error.code)
+            shlog.normal(error.actor)
+            for i in range(3):
+                shlog.normal('Retry ' + str(i) + '/3')
+                time.sleep(30)
+                try:
+                    api_response = getattr(soap_client.service, servicereq)(**request_data)
+                except:
+                    pass
     return api_response
 
 
@@ -88,7 +132,7 @@ def get_activity_scope(act_id, primaserver, user, pw):
     if len(act_note_api) == 0:
         return None
     else:
-        return act_note_api[0]['RawTextNote']
+        return h.html2text(act_note_api[0]['RawTextNote'])
 
 
 def get_activity_tickets(server, user, passw, serv):
@@ -190,7 +234,7 @@ def get_steps_activities(synched, server, user, passw):
 
         activities.update({activities_api[0].ObjectId: {'ProjectId': activities_api[0].ProjectId,
                                                         'Name': activities_api[0].Name,
-                                                        'Owner': get_email(primaserver, primauser, primapasswd,
+                                                        'Owner': get_email(server, user, passw,
                                                                            activities_api[0].ActivityOwnerUserId),
                                                         'Id': activities_api[0].Id,
                                                         'WBS': wbs_extractor(activities_api[0].WBSName),
@@ -291,18 +335,13 @@ def actual_baseline(serv, usr, passw):
         baselines[base['ObjectId']] = {'Name' : base['Name'],
                                        'Date' : base['DataDate']}
     # find max value
-    most_recent = datetime.datetime(1990, 1, 1)
-    most_recent_obj = 0
-    most_recent_name = ''
-    for b in baselines.keys():
-        if baselines[b]['Date'] > most_recent:
-            most_recent = baselines[b]['Date']
-            most_recent_obj = b
-            most_recent_name = baselines[b]['Name']
+    most_recent_obj = max(baselines.keys())
+    most_recent = baselines[most_recent_obj]['Date']
+    most_recent_name = baselines[most_recent_obj]['Name']
     shlog.verbose('Most recent ProjectObjectId/BaselineId identified as ' + str(most_recent_obj) + ', called ' +
                   str(most_recent_name) + ' for date ' + str(most_recent))
 
-    return most_recent_obj  # test 408 495
+    return most_recent_obj
 
 
 def get_email(serv, usr, passw, objectid):
@@ -348,8 +387,9 @@ if __name__ == '__main__':
     # init jira connection
     jcon = Jira('jira-section')
 
-    tickets = get_activity_tickets(primaserver, primauser, primapasswd, jcon.server)
-    step_tickets = get_step_tickets(primaserver, primauser, primapasswd, jcon.server)
+    vpn_toggle(True)
+    # tickets = get_activity_tickets(primaserver, primauser, primapasswd, jcon.server)
+    # step_tickets = get_step_tickets(primaserver, primauser, primapasswd, jcon.server)
     synched = get_synched_activities(primaserver, primauser, primapasswd, jcon.server)
     activities, steps = get_steps_activities(synched, primaserver, primauser, primapasswd)
 
@@ -362,45 +402,52 @@ if __name__ == '__main__':
         activity_steps = step_list_filter(steps, act)
         points = get_total_hours(activity_steps)
         # this will not create duplicates because of a check
-        shlog.normal('Making a request to file a new JIRA Epic or find existing for activity #' + str(act) + ' with:\n'
-                     'Name/Summary: ' + str(activities[act]['Name']) + '\nDescription: ' +
-                     str(activities[act]['Description']) + '\nProject: ' + str(jcon.project))
+        try:
+            shlog.normal('Making a request to file a new JIRA Epic or find existing for activity #' + str(act) + ' with:\n'
+                         'Name/Summary: ' + str(activities[act]['Name']) + '\nDescription: ' +
+                         str(activities[act]['Description']) + '\nProject: ' + str(jcon.project))
+        except UnicodeEncodeError:
+            shlog.normal('A Unicode error happened when processing ' + activities[act]['Name'] +
+                         ', but nobody cared')
+        # some presets happen here
+        team = None
+        if 'ncsa' in jcon.server.lower():
+            code = 139
+        if 'lsst' in jcon.server.lower():
+            code = 130
+            team = 'Data Facility'
         reqnum, jira_id = ju.create_ticket('jira-section', activities[act]['Owner'], ticket=None, parent=None,
                                            summary=activities[act]['Name'], description=activities[act]['Description'],
                                            use_existing=True, project=jcon.project,
                                            prima_code=activities[act]['Id'], WBS=activities[act]['WBS'],
-                                           start=activities[act]['Start'], due=activities[act]['Due'], spoints=points)
+                                           start=activities[act]['Start'], due=activities[act]['Due'], spoints=points,
+                                           team=team)
         shlog.normal('Returned JIRA ticket ' + jira_id)
-        if act in tickets.keys():
-            # if the ticket already exists, update name etc
-            # TODO: put sync logic here
-            # TODO: add a check to see if the ticket id reported by jira matches the one on the record
-            pass
-        else:
-            # post if the lsst id needs to be entered
-            if 'ncsa' in jcon.server.lower():
-                code = 139
-            if 'lsst' in jcon.server.lower():
-                code = 130
-            shlog.normal('Transmitting JIRA ID ' + jira_id + ' back to activity ' + str(act))
-            resp = ticket_post(primaserver, primauser, primapasswd, act, activities[act]['ProjectId'], jira_id, code)
+
+        # post if the lsst id needs to be entered
+        shlog.normal('Transmitting JIRA ID ' + jira_id + ' back to activity ' + str(act))
+        multi_ticket_post(primaserver, primauser, primapasswd, code, activities[act]['Id'], jira_id, True)
+
         # go through steps of the activity in question and create their tickets
         for step in activity_steps:
-            if step in step_tickets.keys():
-                # TODO: add sync here
-                pass
-            else:
+            try:
                 shlog.normal(
                     'Making a request to file a new JIRA story or find existing for step #' + str(step) + ' with:\n'
                      'Name/Summary: ' + str(steps[step]['Name']) + '\nDescription: ' + str(steps[step]['Description'])
                     + '\nProject: ' + str(jcon.project) + '\nParent: ' + jira_id)
-                step_reqnum, step_jira_id = ju.create_ticket('jira-section', None, ticket=None, parent=reqnum,
-                                        summary=steps[step]['Name'], description=steps[step]['Description'],
-                                        project=jcon.project, spoints=steps[step]['Weight'])
-                shlog.normal('Returned JIRA ticket ' + step_jira_id)
-                if 'ncsa' in jcon.server.lower():
-                    code = 151
-                if 'lsst' in jcon.server.lower():
-                    code = 149
-                resp = ticket_post(primaserver, primauser, primapasswd, step, steps[step]['ProjectId'], step_jira_id, code)
-                shlog.normal('Transmitting JIRA ID ' + step_jira_id + ' back to step ' + str(step))
+            except UnicodeEncodeError:
+                shlog.normal('A Unicode error happened when processing ' + steps[step]['Name'] +
+                             ', but nobody cared')
+            step_reqnum, step_jira_id = ju.create_ticket('jira-section', None, ticket=None, parent=reqnum,
+                                    summary=steps[step]['Name'], description=steps[step]['Description'],
+                                    project=jcon.project, spoints=steps[step]['Weight'], team=team)
+            shlog.normal('Returned JIRA ticket ' + step_jira_id)
+
+            if 'ncsa' in jcon.server.lower():
+                code = 151
+            if 'lsst' in jcon.server.lower():
+                code = 149
+            shlog.normal('Transmitting JIRA ID ' + step_jira_id + ' back to step ' + str(step))
+            multi_ticket_post(primaserver, primauser, primapasswd, code, steps[step]['Name'], step_jira_id, False)
+
+    vpn_toggle(True)

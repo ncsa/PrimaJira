@@ -39,23 +39,30 @@ class Jira:
         shlog.verbose('JIRA connection will use:\nServer: ' + jiraserver +
                       '\nUser: ' + jirauser + '\nPass: ' + '*'*len(jirapasswd) + '\nProject: ' + jiraproject)
 
-    def search_for_issue(self,summary,parent=None):
+    def search_for_issue(self,summary,parent=None, name_only_search=False):
+        summary = summary.replace('"','') # checked - search still works the same
         if parent:
-            jql = 'summary ~ "\\"%s\\"" and "Epic Link" = "%s"' % (summary, parent)
+            jql = '''summary ~ "\\"%s\\"" and "Epic Link" = "%s"''' % (summary, parent)
         else:
-            jql = 'summary ~ "\\"%s\\""' % (summary)
+            jql = '''summary ~ "\\"%s\\"" and issuetype = Epic''' % (summary)
+        if name_only_search:
+            jql = '''summary ~ "\\"%s\\""''' % (summary)
+        shlog.verbose('Issuing JQL query: ' + jql)
         issue = self.jira.search_issues(jql)
         count = len(issue)
         return (issue,count)
 
     def search_for_parent(self,project,summary):
-        jql = 'project = "%s" and summary ~ "%s"' % (project, summary)
+        summary = summary.replace('"', '')  # checked - search still works the same
+        jql = '''project = "%s" and summary ~ "%s"''' % (project, summary)
+        shlog.verbose('Issuing JQL query: ' + jql)
         issue = self.jira.search_issues(jql)
         count = len(issue)
         return (issue,count)
 
     def search_for_children(self,project,parent):
         jql = 'project = "%s" and "Epic Link" = "%s"' % (project, parent)
+        shlog.verbose('Issuing JQL query: ' + jql)
         issue = self.jira.search_issues(jql)
         count = len(issue)
         return (issue, count)
@@ -64,7 +71,7 @@ class Jira:
         issue_info = self.jira.issue(key)
         return issue_info
 
-    def create_jira_subtask(self,parent,summary,description,assignee,spoints=None):
+    def create_jira_subtask(self,parent,summary,description,assignee,spoints=None,team=None):
         try:
             parent_issue = self.jira.issue(parent)
         except:
@@ -90,12 +97,14 @@ class Jira:
                             'description': description,
                             'customfield_10206': parent_issue.key, # this is the epic link
                             'assignee':{'name': assignee},
-                            'customfield_10202': spoints
+                            'customfield_10202': spoints,
+                            'customfield_10502': team  # TODO: needs testing
                             }
         subtask = self.jira.create_issue(fields=subtask_dict)
         return subtask.key
 
-    def create_jira_ticket(self,project,summary,description,assignee, wbs=None, start=None, due=None, spoints=None):
+    def create_jira_ticket(self,project,summary,description,assignee, wbs=None, start=None, due=None, spoints=None,
+                           team=None):
         if 'ncsa' in self.server.lower():
             ticket_dict = {'project': {'key': project},
                            'customfield_10537': summary,
@@ -103,7 +112,7 @@ class Jira:
                            'summary': summary,
                            'issuetype': {'name': 'Epic'},
                            'description': description,
-                           'assignee': {'name': assignee},
+                           'assignee': {'name': assignee}, # this works okay!
                            # 'customfield_13234': wbs,
                            'customfield_10630': start.strftime("%Y-%m-%d"),
                            'customfield_11930': due.strftime("%Y-%m-%d"),
@@ -115,11 +124,12 @@ class Jira:
                            'summary': summary,
                            'issuetype':{'name':'Epic'},
                            'description': description,
-                           'assignee':{'name': assignee},
+                           'assignee':{'name': None}, # too many different emails
                            'customfield_10500': wbs,
                            'customfield_11303': start.strftime("%Y-%m-%d"),
                            'customfield_11304': due.strftime("%Y-%m-%d"),
-                           'customfield_10202': spoints
+                           'customfield_10202': spoints,
+                           'customfield_10502': team  # TODO: needs testing
                            }
         ticket = self.jira.create_issue(fields=ticket_dict)
         return ticket.key
