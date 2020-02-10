@@ -7,8 +7,7 @@ def user_id_from_name(serv, usr, passw, name):
     name_first = name.split(' ')[0]
     name_last = name.split(' ')[-1]
     request_data = {'Field': ['ObjectId', 'Name']
-        ,'Filter': "PersonalName like '%%%s%%'" % name_first
-        ,'Filter': "PersonalName like '%%%s%%'" % name_last
+        ,'Filter': "PersonalName like '%%%s%%' and PersonalName like '%%%s%%'" % (name_first, name_last)
     }
     if name:  # if it's not None
         synched = m.soap_request(request_data, serv, 'UserService', 'ReadUsers', usr, passw)
@@ -23,6 +22,27 @@ def post_note(serv, usr, passw, parent, code, note):
                                      'NotebookTopicObjectId': code  # 43 and 38 this better never change
                                      }}
     synched = m.soap_request(request_data, serv, 'ActivityNoteService', 'CreateActivityNotes', usr, passw)
+    return synched
+
+
+def resource_id_from_name(serv, usr, passw, name):
+    name = name.replace(',', '')
+    name_first = name.split(' ')[0]
+    name_last = name.split(' ')[-1]
+    request_data = {'Field': ['ObjectId']
+        , 'Filter': "Name like '%%%s%%' and Name like '%%%s%%' and ResourceType = 'Labor'" % (name_first, name_last)
+                    }
+    if name:  # if it's not None
+        synched = m.soap_request(request_data, serv, 'ResourceService', 'ReadResources', usr, passw)
+        return synched[0]['ObjectId']
+    else:
+        return None
+
+
+def post_resource_assign(serv, usr, passw, activity, name):
+    request_data = {'ResourceAssignment': {'ActivityObjectId': activity,
+                                           'ResourceObjectId': resource_id_from_name(serv, usr, passw, name)}}
+    synched = m.soap_request(request_data, serv, 'ResourceAssignmentService', 'CreateResourceAssignments', usr, passw)
     return synched
 
 # read config and get primavera login info
@@ -77,7 +97,7 @@ if __name__ == '__main__':
                                      }}
         synched = m.soap_request(request_data, primaserver, 'ActivityService', 'CreateActivities', primauser, primapasswd)
         created_activity = synched[0]
-        print(created_activity)
+        print(str(created_activity) + ' ObjectId returned')
         # post descriptions to the new activity
         # purpose
         synched = post_note(primaserver, primauser, primapasswd, created_activity, 38, purpose)
@@ -91,6 +111,9 @@ if __name__ == '__main__':
                 break
             if steps_sheet.cell(row=r, column=1).value == act_name:
                 step_desc = steps_sheet.cell(row=r, column=7).value
+                # assign resources to the parent
+                resource = steps_sheet.cell(row=r, column=3).value
+                post_resource_assign(primaserver, primauser, primapasswd, created_activity, resource)
                 try:
                     step_pts = int(steps_sheet.cell(row=r, column=5).value)/4
                 except TypeError:
