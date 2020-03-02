@@ -115,6 +115,10 @@ def soap_request(request_data, primaserver, primaservice, servicereq, user, pw):
                     api_response = getattr(soap_client.service, servicereq)(**request_data)
                 except:
                     pass
+            if 'ResumeDate: Actual' in error.message:
+                # this one is not critical
+                shlog.normal('ResumeDate error thrown, ignoring...')
+                return
     return api_response
 
 
@@ -300,6 +304,21 @@ def get_step_info(stepid, primaserver, primauser, primapasswd):
     except IndexError:
         out = {'ActivityId':'0',
                'ActivityName':'Error',
+               'Name':'Error'}
+    return out
+
+
+def get_act_info(actid, primaserver, primauser, primapasswd):
+    request_data = {
+        'Field': ['Name', 'Id'],
+        'Filter': "ObjectId = '%s'" % actid}
+    api_resp = soap_request(request_data, primaserver, 'ActivityService', 'ReadActivities', primauser, primapasswd)
+
+    try:
+        out = {'Id':api_resp[0].Id,
+               'Name':api_resp[0].Name}
+    except IndexError:
+        out = {'Id':'0',
                'Name':'Error'}
     return out
 

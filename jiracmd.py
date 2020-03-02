@@ -146,7 +146,8 @@ class Jira:
         self.jira.add_simple_link(issue, {'url':link,'title':title})
 
     def check_if_closed(self,project,issue):
-        jql = 'project = "%s" and id = "%s" and status  = "Closed"' % (project, issue)
+        jql = 'project = "%s" and id = "%s" and (status = "Closed" or status = "Done")' % (project, issue)
+        shlog.verbose('JQL: ' + jql)
         try:
             count = len(self.jira.search_issues(jql))
         except jira.exceptions.JIRAError:
@@ -159,7 +160,8 @@ class Jira:
             return False
 
     def check_if_reopened(self,project,issue):
-        jql = 'project = "%s" and id = "%s" and status  = "Reopened"' % (project, issue)
+        jql = 'project = "%s" and id = "%s" and (status = "Reopened" or status = "To Do")' % (project, issue)
+        shlog.verbose('JQL: ' + jql)
         try:
             count = len(self.jira.search_issues(jql))
         except jira.exceptions.JIRAError:

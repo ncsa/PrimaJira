@@ -60,7 +60,9 @@ step_tickets = m.get_step_tickets(primaserver, primauser, primapasswd, jcon.serv
 # loop through step -> ticket records
 for step in step_tickets:
     closed = jcon.check_if_closed(jcon.project, step_tickets[step])
+    shlog.normal('Step ID ' + str(step) + ' closed = ' + str(closed))
     reopened = jcon.check_if_reopened(jcon.project, step_tickets[step])
+    shlog.normal('Step ID ' + str(step) + ' (re)open = ' + str(reopened))
     info = m.get_step_info(step, primaserver, primauser, primapasswd)
     if closed:
         shlog.normal('\nREPORTED AS CLOSED\nStep ID: ' + str(step) +
@@ -69,7 +71,7 @@ for step in step_tickets:
                       '\nJIRA Story: ' + step_tickets[step])
         resp = post_step_complete(primaserver, primauser, primapasswd, step)
     if reopened:
-        shlog.normal('\nREPORTED AS REOPENED\nStep ID: ' + str(step) +
+        shlog.normal('\nREPORTED AS (RE)OPEN\nStep ID: ' + str(step) +
                      '\nStep Name: ' + info['Name'])
         shlog.verbose('\nParent Activity: ' + info['ActivityName'] +
                       '\nJIRA Story: ' + step_tickets[step])
