@@ -108,17 +108,23 @@ def soap_request(request_data, primaserver, primaservice, servicereq, user, pw):
             shlog.normal(error.message)
             shlog.normal(error.code)
             shlog.normal(error.actor)
+            # do not retry of the error is non-fatal
+            if 'ResumeDate: Actual' in error.message:
+                # this one is not critical
+                shlog.normal('ResumeDate error thrown, ignoring...')
+                return
+            if 'Unique constraint' in error.message:
+                # this one is caused by UDF entry already existing
+                shlog.normal('Error! UDF value already exists, skipping...')
+                return
+            # retry loop
             for i in range(3):
-                shlog.normal('Retry ' + str(i) + '/3')
+                shlog.normal('Will attempt retry ' + str(i+1) + '/3 in 30 seconds')
                 time.sleep(30)
                 try:
                     api_response = getattr(soap_client.service, servicereq)(**request_data)
                 except:
                     pass
-            if 'ResumeDate: Actual' in error.message:
-                # this one is not critical
-                shlog.normal('ResumeDate error thrown, ignoring...')
-                return
     return api_response
 
 

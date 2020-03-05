@@ -45,6 +45,21 @@ def post_resource_assign(serv, usr, passw, activity, name):
     synched = m.soap_request(request_data, serv, 'ResourceAssignmentService', 'CreateResourceAssignments', usr, passw)
     return synched
 
+
+def post_yellow(serv, usr, passw, activity):
+    # add a yellow checkmark to an activity
+    request_data = {'UDFValue': {'ForeignObjectId': activity,
+                                 'ProjectObjectId': m.actual_baseline(serv, usr, passw),
+                                 'Indicator': 'Yellow',
+                                 'UDFTypeObjectId': 153}} # TODO change this
+    # Import into NCSA JIRA is 153
+    # Import into LSST JIRA is 148
+    synched = m.soap_request(request_data, serv, 'UDFValueService', 'CreateUDFValues', usr, passw)
+    request_data['UDFValue']['UDFTypeObjectId'] = 148
+    synched = m.soap_request(request_data, serv, 'UDFValueService', 'CreateUDFValues', usr, passw)
+    return synched
+
+
 # read config and get primavera login info
 parser = configparser.ConfigParser()
 with open('login') as configfile:
@@ -103,6 +118,8 @@ if __name__ == '__main__':
         synched = post_note(primaserver, primauser, primapasswd, created_activity, 38, purpose)
         # scope
         synched = post_note(primaserver, primauser, primapasswd, created_activity, 43, scope)
+        # yellow markings
+        synched = post_yellow(primaserver, primauser, primapasswd, created_activity)
         # go through all steps and find relevant ones
         r = 2
         while True:
