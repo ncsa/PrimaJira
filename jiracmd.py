@@ -145,8 +145,12 @@ class Jira:
             title = issue
         self.jira.add_simple_link(issue, {'url':link,'title':title})
 
-    def check_if_closed(self,project,issue):
-        jql = 'project = "%s" and id = "%s" and (status = "Closed" or status = "Done")' % (project, issue)
+    def check_if_unstarted(self,project,issue):
+        # statuses equivalent to "Not Started"
+        if 'ncsa' in self.server.lower():
+            jql = 'project = "%s" and id = "%s" and (status = "To Do" or status = "Open")' % (project, issue)
+        if 'lsst' in self.server.lower():
+            jql = 'project = "%s" and id = "%s" and status = "To Do"' % (project, issue)
         shlog.verbose('JQL: ' + jql)
         try:
             count = len(self.jira.search_issues(jql))
@@ -159,8 +163,15 @@ class Jira:
         else:
             return False
 
-    def check_if_reopened(self,project,issue):
-        jql = 'project = "%s" and id = "%s" and (status = "Reopened" or status = "To Do")' % (project, issue)
+    def check_if_open(self,project,issue):
+        # statuses equivalent to "In Progress"
+        if 'ncsa' in self.server.lower():
+            jql = 'project = "%s" and id = "%s" and (status = "Reopened" or status = "System Change Control" ' \
+                  'or status = "In Progress" or status = "Blocked" or status = "Waiting on User" ' \
+                  'or status = "Sleeping")' % (project, issue)
+        if 'lsst' in self.server.lower():
+            jql = 'project = "%s" and id = "%s" and (status = "In Progress" or status = "In Review" ' \
+                  'or status = "Reviewed")' % (project, issue)
         shlog.verbose('JQL: ' + jql)
         try:
             count = len(self.jira.search_issues(jql))
@@ -173,5 +184,22 @@ class Jira:
         else:
             return False
 
+    def check_if_complete(self,project,issue):
+        # statuses equivalent to "Completed"
+        if 'ncsa' in self.server.lower():
+            jql = 'project = "%s" and id = "%s" and (status = "Closed" or status = "Resolved")' % (project, issue)
+        if 'lsst' in self.server.lower():
+            jql = 'project = "%s" and id = "%s" and status = "Done"' % (project, issue)
+        shlog.verbose('JQL: ' + jql)
+        try:
+            count = len(self.jira.search_issues(jql))
+        except jira.exceptions.JIRAError:
+            # see:
+            # https://jira.atlassian.com/browse/JRASERVER-23287?focusedCommentId=220596&page=com.atlassian.jira.plugin.system.issuetabpanels%3Acomment-tabpanel#comment-220596
+            count = 0
+        if count > 0:
+            return True
+        else:
+            return False
 
 

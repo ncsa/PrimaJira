@@ -59,10 +59,10 @@ step_tickets = m.get_step_tickets(primaserver, primauser, primapasswd, jcon.serv
 
 # loop through step -> ticket records
 for step in step_tickets:
-    closed = jcon.check_if_closed(jcon.project, step_tickets[step])
+    closed = jcon.check_if_complete(jcon.project, step_tickets[step])
     shlog.normal('Step ID ' + str(step) + ' closed = ' + str(closed))
-    reopened = jcon.check_if_reopened(jcon.project, step_tickets[step])
-    shlog.normal('Step ID ' + str(step) + ' (re)open = ' + str(reopened))
+    inprogress = jcon.check_if_open(jcon.project, step_tickets[step])
+    shlog.normal('Step ID ' + str(step) + ' (re)open = ' + str(inprogress))
     info = m.get_step_info(step, primaserver, primauser, primapasswd)
     if closed:
         shlog.normal('\nREPORTED AS CLOSED\nStep ID: ' + str(step) +
@@ -70,11 +70,12 @@ for step in step_tickets:
         shlog.verbose('\nParent Activity: ' + info['ActivityName'] +
                       '\nJIRA Story: ' + step_tickets[step])
         resp = post_step_complete(primaserver, primauser, primapasswd, step)
-    if reopened:
-        shlog.normal('\nREPORTED AS (RE)OPEN\nStep ID: ' + str(step) +
+    if inprogress:
+        shlog.normal('\nREPORTED AS INPROGRESS\nStep ID: ' + str(step) +
                      '\nStep Name: ' + info['Name'])
         shlog.verbose('\nParent Activity: ' + info['ActivityName'] +
                       '\nJIRA Story: ' + step_tickets[step])
         resp = post_step_complete(primaserver, primauser, primapasswd, step, False)
 
 m.vpn_toggle(False)
+# TODO: mark imported stuff with yellow

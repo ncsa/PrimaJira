@@ -6,13 +6,11 @@ from jiracmd import Jira
 import requests
 
 
-def post_act_complete(server, user, pw, ObjectId, complete=True):
-    if complete:
-        stat = "Completed"
-    else:
-        stat = "In Progress"
+def post_act_complete(server, user, pw, ObjectId, status):
+    # possible status values: "Completed", "In Progress", "Not Started"
     request_data = {'Activity': {'ObjectId': ObjectId,
-                                 'Status': stat}}
+                                 'Status': status}}
+    shlog.normal('Making request to change status to ' + status)
     synched = m.soap_request(request_data, server, 'ActivityService', 'UpdateActivities', user, pw)
     return synched
 
@@ -41,23 +39,36 @@ act_tickets = m.get_activity_tickets(primaserver, primauser, primapasswd, jcon.s
 
 # loop through act -> ticket records
 for act in act_tickets:
-    closed = jcon.check_if_closed(jcon.project, act_tickets[act])
+    closed = jcon.check_if_complete(jcon.project, act_tickets[act])
     shlog.normal('Activity ID ' + str(act) + ' closed = ' + str(closed))
-    reopened = jcon.check_if_reopened(jcon.project, act_tickets[act])
-    shlog.normal('Activity ID ' + str(act) + ' (re)open = ' + str(reopened))
+
+    inprogress = jcon.check_if_open(jcon.project, act_tickets[act])
+    shlog.normal('Activity ID ' + str(act) + ' inprogress = ' + str(inprogress))
+
+    unstarted = jcon.check_if_unstarted(jcon.project, act_tickets[act])
+    shlog.normal('Activity ID ' + str(act) + ' unstarted = ' + str(inprogress))
+
     info = m.get_act_info(act, primaserver, primauser, primapasswd)
     if closed:
         shlog.normal('\nREPORTED AS CLOSED\nAct Object ID: ' + str(act) +
                      '\nID: ' + info['Id'] +
                      '\nActivity Name: ' + info['Name'])
         shlog.verbose('JIRA Story: ' + act_tickets[act])
-        resp = post_act_complete(primaserver, primauser, primapasswd, act)
-    if reopened:
-        shlog.normal('\nREPORTED AS (RE)OPEN\nAct Object ID: ' + str(act) +
+        resp = post_act_complete(primaserver, primauser, primapasswd, act, 'Completed')
+
+    if inprogress:
+        shlog.normal('\nREPORTED AS INPROGRESS\nAct Object ID: ' + str(act) +
                      '\nID: ' + info['Id'] +
                      '\nActivity Name: ' + info['Name'])
         shlog.verbose('JIRA Story: ' + act_tickets[act])
-        resp = post_act_complete(primaserver, primauser, primapasswd, act, False)
+        resp = post_act_complete(primaserver, primauser, primapasswd, act, 'In Progress')
+
+    if unstarted:
+        shlog.normal('\nREPORTED AS NOT STARTED\nAct Object ID: ' + str(act) +
+                     '\nID: ' + info['Id'] +
+                     '\nActivity Name: ' + info['Name'])
+        shlog.verbose('JIRA Story: ' + act_tickets[act])
+        resp = post_act_complete(primaserver, primauser, primapasswd, act, 'Not Started')
 
 m.vpn_toggle(False)
 # TODO: add epic completion > activity completion check
