@@ -16,6 +16,7 @@ import os
 import datetime
 import time
 import html2text as h
+import excel_to_primavera as e
 
 
 def xmlpost(url, user, pw, ComplexType, element, RequestCore):
@@ -199,21 +200,21 @@ def get_step_tickets(server, user, passw, serv):
     return step_tickets
 
 
-def get_synched_activities(servr, user, passw, jiraserv):
+def get_synched_activities(servr, user, passw, jiraserv, color):
     # get all activities to sync
     if 'ncsa' in jiraserv.lower():
         request_data = {
             'Field': ['Indicator', 'ForeignObjectId'],
-            'Filter': "UDFTypeTitle = 'Import into NCSA JIRA' and Indicator = 'Green'"}
+            'Filter': "UDFTypeTitle = 'Import into NCSA JIRA' and Indicator = '%s'" % color}
     if 'lsst' in jiraserv.lower():
         request_data = {
             'Field': ['Indicator', 'ForeignObjectId'],
-            'Filter': "UDFTypeTitle = 'Import into LSST JIRA' and Indicator = 'Green'"}
+            'Filter': "UDFTypeTitle = 'Import into LSST JIRA' and Indicator = '%s'" % color}
     shlog_list = ''
     for field in request_data['Field']:
         shlog_list += field + ', '
-    shlog.verbose('Making Primavera request to get all activities with a '
-                  'green checkmark ready for export, fields: ' + shlog_list[:-2])
+    shlog.verbose('Making Primavera request to get all activities with a ' + color +
+                  ' checkmark, fields: ' + shlog_list[:-2])
     synched = soap_request(request_data, servr, 'UDFValueService', 'ReadUDFValues', user, passw)
     return synched
 
@@ -244,7 +245,7 @@ def get_steps_activities(synched, server, user, passw):
 
         activities.update({activities_api[0].ObjectId: {'ProjectId': activities_api[0].ProjectId,
                                                         'Name': activities_api[0].Name,
-                                                        'Owner': get_email(server, user, passw,
+                                                        'Owner': get_email(jcon, server, user, passw,
                                                                            activities_api[0].ActivityOwnerUserId),
                                                         'Id': activities_api[0].Id,
                                                         'WBS': wbs_extractor(activities_api[0].WBSName),
@@ -351,25 +352,45 @@ def actual_baseline(serv, usr, passw):
     :param passw: P password
     :return:
     """
-    # request baseline data from the server
-    request_data = {'Field': ['DataDate', 'Name', 'ObjectId']}
-    response = soap_request(request_data, serv, 'BaselineProjectService', 'ReadBaselineProjects', usr, passw)
-    # convert response into a parseable dict
-    baselines = {}
-    for base in response:
-        baselines[base['ObjectId']] = {'Name' : base['Name'],
-                                       'Date' : base['DataDate']}
-    # find max value
-    most_recent_obj = max(baselines.keys())
-    most_recent = baselines[most_recent_obj]['Date']
-    most_recent_name = baselines[most_recent_obj]['Name']
-    shlog.verbose('Most recent ProjectObjectId/BaselineId identified as ' + str(most_recent_obj) + ', called ' +
-                  str(most_recent_name) + ' for date ' + str(most_recent))
+    # # request baseline data from the server
+    # request_data = {'Field': ['DataDate', 'Name', 'ObjectId']}
+    # response = soap_request(request_data, serv, 'BaselineProjectService', 'ReadBaselineProjects', usr, passw)
+    # # convert response into a parseable dict
+    # baselines = {}
+    # for base in response:
+    #     baselines[base['ObjectId']] = {'Name' : base['Name'],
+    #                                    'Date' : base['DataDate']}
+    # # find max value
+    # most_recent_obj = max(baselines.keys())
+    # most_recent = baselines[most_recent_obj]['Date']
+    # most_recent_name = baselines[most_recent_obj]['Name']
+    # shlog.verbose('Most recent ProjectObjectId/BaselineId identified as ' + str(most_recent_obj) + ', called ' +
+    #               str(most_recent_name) + ' for date ' + str(most_recent))
+
+    # Create activity
+    request_data = {'Activity': {'Name': 'Will be deleted in 2 sec',
+                                 'AtCompletionDuration': 0,
+                                 'CalendarObjectId': 638,  # NCSA Standard with Holidays, ok to hardcode
+                                 'ProjectId': 'LSST MREFC',
+                                 'WBSObjectId': 4597,
+                                 'WBSPath': 'LSST MREFC.MREFC.LSST Construction.Test WBS',  # the big dump
+                                 }}
+    synched = soap_request(request_data, serv, 'ActivityService', 'CreateActivities', usr, passw)
+    created_activity = synched[0]
+
+    # request its baseline id
+    request_data = {'Field': ['ProjectObjectId'], 'Filter': "ObjectId = '%s'" % str(created_activity)}
+    resp = soap_request(request_data, serv, 'ActivityService', 'ReadActivities', usr, passw)
+    most_recent_obj = resp[0]['ProjectObjectId']
+
+    # delete the activity
+    request_data = {'ObjectId': '%s' % str(created_activity)}
+    synched = soap_request(request_data, serv, 'ActivityService', 'DeleteActivities', usr, passw)
 
     return most_recent_obj
 
 
-def get_email(serv, usr, passw, objectid):
+def get_email(jcon, serv, usr, passw, objectid):
     """get username from activity owner
 
     :param serv: P server
@@ -382,8 +403,14 @@ def get_email(serv, usr, passw, objectid):
                     'Filter': "ObjectId = '%s'" % objectid}
     if objectid:  # if it's not None
         synched = soap_request(request_data, serv, 'UserService', 'ReadUsers', usr, passw)
-        return synched[0]['EmailAddress'].split('@')[0]
     else:
+        return None
+
+    k = jcon.search_for_user(synched[0]['EmailAddress'])
+    try:
+        name = k[0].name
+        return name
+    except IndexError:
         return None
 
 
@@ -415,7 +442,7 @@ if __name__ == '__main__':
     vpn_toggle(True)
     # tickets = get_activity_tickets(primaserver, primauser, primapasswd, jcon.server)
     # step_tickets = get_step_tickets(primaserver, primauser, primapasswd, jcon.server)
-    synched = get_synched_activities(primaserver, primauser, primapasswd, jcon.server)
+    synched = get_synched_activities(primaserver, primauser, primapasswd, jcon.server, 'Yellow')
     activities, steps = get_steps_activities(synched, primaserver, primauser, primapasswd)
 
     # pass
@@ -474,5 +501,14 @@ if __name__ == '__main__':
                 code = 149
             shlog.normal('Transmitting JIRA ID ' + step_jira_id + ' back to step ' + str(step))
             multi_ticket_post(primaserver, primauser, primapasswd, code, steps[step]['Name'], step_jira_id, False)
+
+        # if we got this far, that means that the activity had been processed succesfully
+        # time to post some checkmarks
+        if 'ncsa' in jcon.server.lower():
+            code = 153
+        if 'lsst' in jcon.server.lower():
+            code = 148
+        e.remove_colors(primaserver, primauser, primapasswd, act, code)
+        e.post_color(primaserver, primauser, primapasswd, act, 'Green', code)
 
     vpn_toggle(True)

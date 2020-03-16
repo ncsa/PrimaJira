@@ -29,7 +29,7 @@ if __name__ == '__main__':
 
     m.vpn_toggle(True)
     # get all NCSA activities and steps with green checkmarks
-    synched = m.get_synched_activities(primaserver, primauser, primapasswd, 'https://jira.ncsa.illinois.edu')
+    synched = m.get_synched_activities(primaserver, primauser, primapasswd, 'https://jira.ncsa.illinois.edu', 'Green')
     activities, steps = m.get_steps_activities(synched, primaserver, primauser, primapasswd)
 
     # build two dicts with actid to jira ids

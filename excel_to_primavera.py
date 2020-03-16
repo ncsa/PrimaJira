@@ -1,6 +1,7 @@
 import openpyxl
 import configparser
 import main as m
+import shlog
 
 
 def user_id_from_name(serv, usr, passw, name):
@@ -46,18 +47,26 @@ def post_resource_assign(serv, usr, passw, activity, name):
     return synched
 
 
-def post_yellow(serv, usr, passw, activity):
-    # add a yellow checkmark to an activity
+def post_color(serv, usr, passw, activity, color, code):
+    # add a checkmark to an activity
+    # colors available: Yellow, Green
+    if color not in ['Yellow','Green']:
+        shlog.normal('Color error! ' + str(color) + ' not in list: Yellow, Green')
+        exit(0)
     request_data = {'UDFValue': {'ForeignObjectId': activity,
                                  'ProjectObjectId': m.actual_baseline(serv, usr, passw),
-                                 'Indicator': 'Yellow',
-                                 'UDFTypeObjectId': 153}} # TODO change this
+                                 'Indicator': color,
+                                 'UDFTypeObjectId': code}}
     # Import into NCSA JIRA is 153
     # Import into LSST JIRA is 148
     synched = m.soap_request(request_data, serv, 'UDFValueService', 'CreateUDFValues', usr, passw)
-    request_data['UDFValue']['UDFTypeObjectId'] = 148
-    synched = m.soap_request(request_data, serv, 'UDFValueService', 'CreateUDFValues', usr, passw)
+    shlog.verbose('Server response: ' + str(synched))
     return synched
+
+def remove_colors(serv, usr, passw, activity, code):
+    # use ticket_wipe to make udf delete calls
+    resp = m.ticket_wipe(serv, usr, passw, activity, code)
+    return resp
 
 
 # read config and get primavera login info
@@ -71,6 +80,9 @@ primaserver=primadict['server']
 # read tool config
 tool_dict = parser['tool-settings']
 tool_log = tool_dict['loglevel']
+loglevel=shlog.__dict__[tool_log]
+assert type(loglevel) == type(1)
+shlog.basicConfig(level=shlog.__dict__[tool_log])
 tool_fixer = tool_dict['fix']
 if tool_fixer.lower() in ['true', '1', 't', 'y', 'yes', 'yeah', 'yup', 'certainly', 'uh-huh']:
     tool_fixer = True
@@ -112,14 +124,12 @@ if __name__ == '__main__':
                                      }}
         synched = m.soap_request(request_data, primaserver, 'ActivityService', 'CreateActivities', primauser, primapasswd)
         created_activity = synched[0]
-        print(str(created_activity) + ' ObjectId returned')
+        shlog.normal(str(created_activity) + ' ObjectId returned')
         # post descriptions to the new activity
         # purpose
         synched = post_note(primaserver, primauser, primapasswd, created_activity, 38, purpose)
         # scope
         synched = post_note(primaserver, primauser, primapasswd, created_activity, 43, scope)
-        # yellow markings
-        synched = post_yellow(primaserver, primauser, primapasswd, created_activity)
         # go through all steps and find relevant ones
         r = 2
         while True:
@@ -144,5 +154,8 @@ if __name__ == '__main__':
                 # created_activity = synched[0]
             r += 1
         i += 1
+        # yellow markings to celebrate completion
+        synched = post_color(primaserver, primauser, primapasswd, created_activity, 'Yellow', 153)
+        synched = post_color(primaserver, primauser, primapasswd, created_activity, 'Yellow', 148)
 
     # 41186

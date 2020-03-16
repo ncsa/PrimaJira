@@ -202,4 +202,9 @@ class Jira:
         else:
             return False
 
+    def search_for_user(self, email):
+        users = self.jira.search_users(email)
+        return users
+
+
 
