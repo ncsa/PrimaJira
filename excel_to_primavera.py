@@ -102,11 +102,11 @@ if __name__ == '__main__':
     i = 2
     while True:
         import_check = acts_sheet.cell(row=i, column=1).value
+        act_name = acts_sheet.cell(row=i, column=2).value
         if import_check == 'TRUE' or import_check == True:
             continue  # skip TRUE items
-        if import_check == '' or import_check == None or import_check == ' ':
+        if import_check == '' or import_check == None or import_check == ' ' or act_name == None:
             break  # stop execution
-        act_name = acts_sheet.cell(row=i, column=2).value
         shlog.verbose('Processing activity called ' + act_name)
         owner = acts_sheet.cell(row=i, column=3).value
         api_owner_obj, api_owner_name = user_id_from_name(primaserver, primauser, primapasswd, owner)
@@ -138,7 +138,7 @@ if __name__ == '__main__':
             step_name = steps_sheet.cell(row=r, column=2).value
             if step_name == '' or step_name == None or step_name == ' ':
                 break
-            if steps_sheet.cell(row=r, column=1).value == act_name:
+            if steps_sheet.cell(row=r, column=1).value.lower() == act_name.lower():
                 shlog.verbose('Processing step called ' + step_name)
                 step_desc = steps_sheet.cell(row=r, column=7).value
                 # assign resources to the parent
