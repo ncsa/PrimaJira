@@ -5,12 +5,12 @@ import shlog
 
 
 def user_id_from_name(serv, usr, passw, name):
-    name_first = name.split(' ')[0]
-    name_last = name.split(' ')[-1]
-    request_data = {'Field': ['ObjectId', 'Name']
-        ,'Filter': "PersonalName like '%%%s%%' and PersonalName like '%%%s%%'" % (name_first, name_last)
-    }
     if name:  # if it's not None
+        name_first = name.split(' ')[0]
+        name_last = name.split(' ')[-1]
+        request_data = {'Field': ['ObjectId', 'Name']
+            , 'Filter': "PersonalName like '%%%s%%' and PersonalName like '%%%s%%'" % (name_first, name_last)
+                        }
         synched = m.soap_request(request_data, serv, 'UserService', 'ReadUsers', usr, passw)
         return synched[0]['ObjectId'], synched[0]['Name']
     else:
@@ -96,6 +96,7 @@ if __name__ == '__main__':
     acts_sheet = workbook.get_sheet_by_name('Epic Suggestions')
     steps_sheet = workbook.get_sheet_by_name('TaskStory Suggestion')
 
+    m.vpn_toggle(True)
     # go through activity entries in the file
     # because max_row method counts rows even after they've been wiped, it's time to go back to the old VBA ways...
     i = 2
@@ -106,6 +107,7 @@ if __name__ == '__main__':
         if import_check == '' or import_check == None or import_check == ' ':
             break  # stop execution
         act_name = acts_sheet.cell(row=i, column=2).value
+        shlog.verbose('Processing activity called ' + act_name)
         owner = acts_sheet.cell(row=i, column=3).value
         api_owner_obj, api_owner_name = user_id_from_name(primaserver, primauser, primapasswd, owner)
         purpose = acts_sheet.cell(row=i, column=6).value
@@ -137,6 +139,7 @@ if __name__ == '__main__':
             if step_name == '' or step_name == None or step_name == ' ':
                 break
             if steps_sheet.cell(row=r, column=1).value == act_name:
+                shlog.verbose('Processing step called ' + step_name)
                 step_desc = steps_sheet.cell(row=r, column=7).value
                 # assign resources to the parent
                 resource = steps_sheet.cell(row=r, column=3).value
@@ -159,3 +162,4 @@ if __name__ == '__main__':
         synched = post_color(primaserver, primauser, primapasswd, created_activity, 'Yellow', 148)
 
     # 41186
+    m.vpn_toggle(False)
