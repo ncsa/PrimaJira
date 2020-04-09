@@ -8,7 +8,7 @@ Features code originally developed by Michael Johnson and Donald Petravick:
 
 Uses Python 2.7+
 
-VPN features require Cisco AnyConnect installed and use code by unode:
+VPN features require Cisco AnyConnect installed and use code by Renato Alves:
 * https://github.com/unode/panyc
 
 ## Use
@@ -18,5 +18,14 @@ Fill out the fields specified in *login_sample* and rename the file to *login*. 
 
 The tool will take it from there.
 
+## activity_complete.py
+Goes through activities, finds their corresponding Epics and checks the Started/Finished checkboxes depending on the Epics' completion.
+
 ## diff.py
-diff.py will compare Primavera and JIRA instances specified in the *login* file for inconsistencies, alert the user and suggest further action.
+Compares Primavera and JIRA instances specified in the *login* file for inconsistencies, alerts the user and suggests further action.
+
+## excel_to_primavera.py
+Creates Activities and Steps within them from an excel file named input.xlsx
+
+## jira_lync.py
+Goes through Activities and their Steps, gathering their ticket records. Then, it will create records in the NCSA JIRA about corresponding tickets in the LSST JIRA.
