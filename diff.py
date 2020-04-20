@@ -59,7 +59,7 @@ shlog.verbose('Getting ticket IDs and activities due for export')
 tickets = m.get_activity_tickets(primaserver, primauser, primapasswd, con.server)
 step_tickets = m.get_step_tickets(primaserver, primauser, primapasswd, con.server)
 synched = m.get_synched_activities(primaserver, primauser, primapasswd, con.server, 'Green')
-activities, steps = m.get_steps_activities(synched, primaserver, primauser, primapasswd)
+activities, steps = m.get_steps_activities(con, synched, primaserver, primauser, primapasswd)
 
 # find activities not yet imported
 shlog.normal('\n---CHECKING FOR ACTIVITIES NOT YET IMPORTED---')

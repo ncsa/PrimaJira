@@ -3,7 +3,7 @@
 
 import os
 import time
-import ConfigParser
+import configparser
 import jiracmd
 
 def get_con(jira_section, retry = 3,sleep = 15):
@@ -14,7 +14,7 @@ def get_con(jira_section, retry = 3,sleep = 15):
         except:
             num_retries += 1
             time.sleep(sleep)
-            print "JIRA Connection Error...Retry #{num}".format(num=num_retries)
+            print("JIRA Connection Error...Retry %s" % num_retries)
 
 def get_jira_user(section='jira-desdm',services_file=None):
     Config = ConfigParser.ConfigParser()

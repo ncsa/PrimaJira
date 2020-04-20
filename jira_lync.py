@@ -30,7 +30,7 @@ if __name__ == '__main__':
     m.vpn_toggle(True)
     # get all NCSA activities and steps with green checkmarks
     synched = m.get_synched_activities(primaserver, primauser, primapasswd, 'https://jira.ncsa.illinois.edu', 'Green')
-    activities, steps = m.get_steps_activities(synched, primaserver, primauser, primapasswd)
+    activities, steps = m.get_steps_activities(jcon, synched, primaserver, primauser, primapasswd)
 
     # build two dicts with actid to jira ids
     ncsa_tickets = m.get_activity_tickets(primaserver, primauser, primapasswd, 'ncsa')

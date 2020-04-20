@@ -98,7 +98,7 @@ class Jira:
                             'customfield_10206': parent_issue.key, # this is the epic link
                             'assignee':{'name': assignee},
                             'customfield_10202': spoints,
-                            'customfield_10502': team  # TODO: needs testing
+                            'customfield_10502': {"value": team}  # TODO: needs testing
                             }
         subtask = self.jira.create_issue(fields=subtask_dict)
         return subtask.key
@@ -129,7 +129,7 @@ class Jira:
                            'customfield_11303': start.strftime("%Y-%m-%d"),
                            'customfield_11304': due.strftime("%Y-%m-%d"),
                            'customfield_10202': spoints,
-                           'customfield_10502': team  # TODO: needs testing
+                           'customfield_10502': {"value": team}  # TODO: needs testing
                            }
         ticket = self.jira.create_issue(fields=ticket_dict)
         return ticket.key
@@ -203,7 +203,11 @@ class Jira:
             return False
 
     def search_for_user(self, email):
-        users = self.jira.search_users(email)
+        users = self.jira.search_assignable_users_for_issues(email, project=self.project)
+        # remove test users
+        for user in users:
+            if 'test' in user.displayName.lower() or 'test' in user.emailAddress.lower():
+                users.remove(user)
         return users
 
 

@@ -219,7 +219,7 @@ def get_synched_activities(servr, user, passw, jiraserv, color):
     return synched
 
 
-def get_steps_activities(synched, server, user, passw):
+def get_steps_activities(jcon, synched, server, user, passw):
     activities = {}
     steps = {}
     baseline = actual_baseline(server, user, passw)
@@ -443,7 +443,7 @@ if __name__ == '__main__':
     # tickets = get_activity_tickets(primaserver, primauser, primapasswd, jcon.server)
     # step_tickets = get_step_tickets(primaserver, primauser, primapasswd, jcon.server)
     synched = get_synched_activities(primaserver, primauser, primapasswd, jcon.server, 'Yellow')
-    activities, steps = get_steps_activities(synched, primaserver, primauser, primapasswd)
+    activities, steps = get_steps_activities(jcon, synched, primaserver, primauser, primapasswd)
 
     # pass
     # exit(0) # A6830
