@@ -72,6 +72,7 @@ class VPNManager(object):
 
         elif i == shift - 1:
             self.timeout()
+            # return i
 
         else:
             return i

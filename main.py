@@ -41,7 +41,7 @@ def xmlpost(url, user, pw, ComplexType, element, RequestCore):
     shlog.verbose('Making request to url ' + url)
     shlog.verbose('Request body: ' + body.replace(pw, '*'*len(pw)))
     response = requests.post(url, verify=False, data=body)
-    shlog.verbose('Server response: ' + response.content)
+    shlog.verbose('Server response: ' + str(response.content))
     return response
 
 

@@ -30,8 +30,9 @@ def resource_id_from_name(serv, usr, passw, name):
     name = name.replace(',', '')
     name_first = name.split(' ')[0]
     name_last = name.split(' ')[-1]
-    request_data = {'Field': ['ObjectId']
-        , 'Filter': "Name like '%%%s%%' and Name like '%%%s%%' and ResourceType = 'Labor'" % (name_first, name_last)
+    request_data = {'Field': ['ObjectId','Id']
+        , 'Filter': "Name like '%%%s%%' and Name like '%%%s%%' and ResourceType = 'Labor' and Id not like 'RS%%'"
+                    "" % (name_first, name_last)
                     }
     if name:  # if it's not None
         synched = m.soap_request(request_data, serv, 'ResourceService', 'ReadResources', usr, passw)
