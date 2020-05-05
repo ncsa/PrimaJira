@@ -44,11 +44,19 @@ def resource_id_from_name(serv, usr, passw, name):
 def post_resource_assign(serv, usr, passw, activity, name):
     resource = resource_id_from_name(serv, usr, passw, name)
     # check if the resource had already been assigned
-
-    # actual post
-    request_data = {'ResourceAssignment': {'ActivityObjectId': activity,
-                                           'ResourceObjectId': resource}}
-    synched = m.soap_request(request_data, serv, 'ResourceAssignmentService', 'CreateResourceAssignments', usr, passw)
+    request_data = {'Field': ['ResourceObjectId'],
+                    'Filter': "ActivityObjectId = '%s' and ResourceObjectId = '%s'" % (str(activity), str(resource))}
+    resp = m.soap_request(request_data, primaserver, 'ResourceAssignmentService', 'ReadResourceAssignments', primauser,
+                          primapasswd)
+    if len(resp) > 0:
+        # already assigned
+        synched = 'already assigned'
+        shlog.verbose(name + ' ' + synched)
+    else:
+        # actual post
+        request_data = {'ResourceAssignment': {'ActivityObjectId': activity,
+                                               'ResourceObjectId': resource}}
+        synched = m.soap_request(request_data, serv, 'ResourceAssignmentService', 'CreateResourceAssignments', usr, passw)
     return synched
 
 
