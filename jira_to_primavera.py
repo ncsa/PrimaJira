@@ -73,7 +73,7 @@ def update_step_desc(server, usr, passw, parent, objectid, desc):
 
 if __name__ == '__main__':
     # get epic list
-    # m.vpn_toggle(True)
+    m.vpn_toggle(True)
     shlog.verbose('Getting ticket IDs and activities to analyze')
     tickets = m.get_activity_tickets(primaserver, primauser, primapasswd, con.server)
     step_tickets = m.get_step_tickets(primaserver, primauser, primapasswd, con.server)
@@ -153,10 +153,4 @@ if __name__ == '__main__':
         # get primavera step count
 
         # completedness is handled elsewhere (by a cron job)
-        # add different jira handling
-
-
-
-
-
-# if there are more steps in epic, import step to jira
+        m.vpn_toggle(False)

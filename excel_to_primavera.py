@@ -42,8 +42,12 @@ def resource_id_from_name(serv, usr, passw, name):
 
 
 def post_resource_assign(serv, usr, passw, activity, name):
+    resource = resource_id_from_name(serv, usr, passw, name)
+    # check if the resource had already been assigned
+
+    # actual post
     request_data = {'ResourceAssignment': {'ActivityObjectId': activity,
-                                           'ResourceObjectId': resource_id_from_name(serv, usr, passw, name)}}
+                                           'ResourceObjectId': resource}}
     synched = m.soap_request(request_data, serv, 'ResourceAssignmentService', 'CreateResourceAssignments', usr, passw)
     return synched
 
@@ -111,8 +115,8 @@ if __name__ == '__main__':
         shlog.verbose('Processing activity called ' + act_name)
         owner = acts_sheet.cell(row=i, column=3).value
         api_owner_obj, api_owner_name = user_id_from_name(primaserver, primauser, primapasswd, owner)
-        purpose = acts_sheet.cell(row=i, column=6).value
-        scope = acts_sheet.cell(row=i, column=7).value
+        purpose = acts_sheet.cell(row=i, column=5).value
+        scope = acts_sheet.cell(row=i, column=6).value
         # Activity creation code
         request_data = {'Activity': {'Name': act_name,
                                      'AtCompletionDuration': 0,
