@@ -47,7 +47,8 @@ if __name__ == '__main__':
                 shlog.normal('Success linking ' + ncsa_tickets[act] + ' and ' + lsst_tickets[act])
             except (jira.exceptions.JIRAError) as e:
                 # jira failures mean we can't sync anything
-                shlog.normal('Jira operation faled with error:')
+                shlog.normal('Jira operation for Epic ' + ncsa_tickets[act] + '/' + lsst_tickets[act] +
+                             ' faled with error:')
                 print(e)
         activity_steps = m.step_list_filter(steps, act)
         for step in activity_steps:
@@ -57,6 +58,7 @@ if __name__ == '__main__':
                     shlog.normal('Success linking ' + ncsa_step_tickets[step] + ' and ' + lsst_step_tickets[step])
                 except (jira.exceptions.JIRAError) as e:
                     # jira failures mean we can't sync anything
-                    shlog.normal('Jira operation faled with error:')
+                    shlog.normal('Jira operation for Story ' + ncsa_step_tickets[step] + '/' + lsst_step_tickets[step] +
+                                 ' faled with error:')
                     print(e)
     m.vpn_toggle(False)
