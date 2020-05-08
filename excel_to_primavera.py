@@ -6,6 +6,7 @@ import shlog
 
 def user_id_from_name(serv, usr, passw, name):
     if name:  # if it's not None
+        name = name.replace(',', '')
         name_first = name.split(' ')[0]
         name_last = name.split(' ')[-1]
         request_data = {'Field': ['ObjectId', 'Name']
@@ -36,29 +37,74 @@ def resource_id_from_name(serv, usr, passw, name):
                     }
     if name:  # if it's not None
         synched = m.soap_request(request_data, serv, 'ResourceService', 'ReadResources', usr, passw)
-        return synched[0]['ObjectId']
+        try:
+            return synched[0]['ObjectId']
+        except IndexError:
+            # name not found in resources
+            return None
     else:
         return None
 
 
 def post_resource_assign(serv, usr, passw, activity, name):
     resource = resource_id_from_name(serv, usr, passw, name)
-    # check if the resource had already been assigned
-    request_data = {'Field': ['ResourceObjectId'],
-                    'Filter': "ActivityObjectId = '%s' and ResourceObjectId = '%s'" % (str(activity), str(resource))}
-    resp = m.soap_request(request_data, primaserver, 'ResourceAssignmentService', 'ReadResourceAssignments', primauser,
-                          primapasswd)
-    if len(resp) > 0:
-        # already assigned
-        synched = 'already assigned'
-        shlog.verbose(name + ' ' + synched)
+    if resource:
+        # check if the resource had already been assigned
+        request_data = {'Field': ['ResourceObjectId'],
+                        'Filter': "ActivityObjectId = '%s' and ResourceObjectId = '%s'" % (str(activity), str(resource))}
+        resp = m.soap_request(request_data, primaserver, 'ResourceAssignmentService', 'ReadResourceAssignments', primauser,
+                              primapasswd)
+        if len(resp) > 0:
+            # already assigned
+            synched = 'already assigned to activity #' + str(activity)
+            shlog.verbose(name + ' ' + synched)
+        else:
+            # actual post
+            request_data = {'ResourceAssignment': {'ActivityObjectId': activity,
+                                                   'ResourceObjectId': resource}}
+            synched = m.soap_request(request_data, serv, 'ResourceAssignmentService', 'CreateResourceAssignments', usr, passw)
     else:
-        # actual post
-        request_data = {'ResourceAssignment': {'ActivityObjectId': activity,
-                                               'ResourceObjectId': resource}}
-        synched = m.soap_request(request_data, serv, 'ResourceAssignmentService', 'CreateResourceAssignments', usr, passw)
+        return name + ' not found in resources'
     return synched
 
+
+def post_step_resource_assign(serv, usr, passw, step, name):
+    resource = resource_id_from_name(serv, usr, passw, name)
+    if resource:
+        # check if the resource had already been assigned
+        name = name.replace(',', '')
+        name_first = name.split(' ')[0]
+        name_last = name.split(' ')[-1]
+        request_data = {
+            'Field': ['Text'],
+            'Filter': "UDFTypeObjectId = '158' and ForeignObjectId = '%s' and Text like '%%%s%%' and "
+                      "Text like '%%%s%%'" % (str(step), str(name_first), str(name_last))}
+        resp = m.soap_request(request_data, primaserver, 'UDFValueService', 'ReadUDFValues', primauser, primapasswd)
+        if len(resp) > 0:
+            # already assigned
+            synched = 'already assigned to step #' + str(step)
+            shlog.verbose(name + ' ' + synched)
+        else:
+            # actual post
+            try:
+                request_data = {'Field': ['Name'],
+                                'Filter': "ObjectId = '%s'" % str(resource)
+                               }
+                synched = m.soap_request(request_data, serv, 'ResourceService', 'ReadResources', usr, passw)
+                if len(synched) > 0:  # if it's not None
+                    p6_name = synched[0]['Name']
+                else:
+                    p6_name = None
+
+                baseline = m.actual_baseline(serv, usr, passw)
+                resp = m.ticket_wipe(primaserver, primauser, primapasswd, step, 158) # just in case
+                shlog.verbose('Posting name ' + p6_name + ' to step #' + str(step))
+                m.ticket_post(serv, usr, passw, step, baseline, p6_name, 158)
+            except IndexError:
+                return 'IndexError thrown, user not found'
+    else:
+        return name + ' not found in resources'
+    return synched
 
 def post_color(serv, usr, passw, activity, color, code):
     # add a checkmark to an activity
@@ -167,7 +213,9 @@ if __name__ == '__main__':
                                              'Name': step_name,
                                              'Weight': step_pts}}
                 synched = m.soap_request(request_data, primaserver, 'ActivityStepService', 'CreateActivitySteps', primauser, primapasswd)
-                # created_activity = synched[0]
+                created_step = synched[0]
+                post_step_resource_assign(primaserver, primauser, primapasswd, created_step, resource)
+
             r += 1
         i += 1
         # yellow markings to celebrate completion

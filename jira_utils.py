@@ -17,7 +17,7 @@ def get_con(jira_section, retry = 3,sleep = 15):
             print("JIRA Connection Error...Retry %s" % num_retries)
 
 def get_jira_user(section='jira-desdm',services_file=None):
-    Config = ConfigParser.ConfigParser()
+    Config = configparser.ConfigParser()
     if not services_file:
         services_file = os.path.join(os.environ['HOME'],'.desservices.ini')
     try:
@@ -31,7 +31,7 @@ def get_jira_user(section='jira-desdm',services_file=None):
 def use_existing_ticket(con,dict):
     """Looks to see if JIRA ticket exists. If it does it will use it instead
        of creating a new ticket. Returns reqnum,jira_id"""
-    Config = ConfigParser.ConfigParser()
+    Config = configparser.ConfigParser()
     Config.read('login')
     jiraproject = Config.get('jira-section', 'project')
     issues,count = con.search_for_issue(dict['summary'])
