@@ -202,12 +202,19 @@ class Jira:
         else:
             return False
 
-    def search_for_user(self, email):
-        users = self.jira.search_assignable_users_for_issues(email, project=self.project)
+    def search_for_user(self, email, name):
+        users = self.jira.search_users(email)
         # remove test users
         for user in users:
             if 'test' in user.displayName.lower() or 'test' in user.emailAddress.lower():
                 users.remove(user)
+        # fallback for different email edge cases
+        if len(users) == 0:
+            name = name.replace(',', '')
+            users = self.jira.search_users(name)
+            for user in users:
+                if 'test' in user.displayName.lower() or 'test' in user.emailAddress.lower():
+                    users.remove(user)
         return users
 
 

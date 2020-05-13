@@ -414,7 +414,7 @@ def get_email(jcon, serv, usr, passw, objectid):
     :param objectid: ID of activity object
     :return: None or user
     """
-    request_data = {'Field': ['EmailAddress'],
+    request_data = {'Field': ['EmailAddress', 'Name'],
                     'Filter': "ObjectId = '%s'" % objectid}
     if objectid:  # if it's not None
         synched = soap_request(request_data, serv, 'UserService', 'ReadUsers', usr, passw)
@@ -422,7 +422,7 @@ def get_email(jcon, serv, usr, passw, objectid):
         return None
 
     try:
-        k = jcon.search_for_user(synched[0]['EmailAddress'])
+        k = jcon.search_for_user(synched[0]['EmailAddress'], synched[0]['Name'])
         name = k[0].name
         return name
     except IndexError:
@@ -434,7 +434,7 @@ def get_email_step(jcon, serv, usr, passw, name):
     name_first = name.split(' ')[0]
     name_last = name.split(' ')[-1]
 
-    request_data = {'Field': ['EmailAddress'],
+    request_data = {'Field': ['EmailAddress', 'Name'],
                     'Filter': "PersonalName like '%%%s%%' and PersonalName like '%%%s%%'" % (name_first, name_last)}
     if name:  # if it's not None
         synched = soap_request(request_data, serv, 'UserService', 'ReadUsers', usr, passw)
@@ -442,7 +442,7 @@ def get_email_step(jcon, serv, usr, passw, name):
         return None
 
     try:
-        k = jcon.search_for_user(synched[0]['EmailAddress'])
+        k = jcon.search_for_user(synched[0]['EmailAddress'], synched[0]['Name'])
         name = k[0].name
         return name
     except IndexError:
