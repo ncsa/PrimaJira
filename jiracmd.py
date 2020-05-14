@@ -79,6 +79,9 @@ class Jira:
             print(warning)
             sys.exit()
 
+        if assignee is None:
+            assignee = self.user
+
         if 'ncsa' in self.server.lower():
             subtask_dict = {'project': {'key': parent_issue.fields.project.key},
                             'summary': summary,
@@ -86,7 +89,7 @@ class Jira:
                             'issuetype': {'name': 'Story'},
                             'description': description,
                             'customfield_10536': parent_issue.key,  # this is the epic link
-                            'assignee': {'name': assignee},
+                            'reporter': {'name': assignee},
                             'customfield_10532': spoints
                             }
         if 'lsst' in self.server.lower():
@@ -96,7 +99,7 @@ class Jira:
                             'issuetype':{'name':'Story'},
                             'description': description,
                             'customfield_10206': parent_issue.key, # this is the epic link
-                            'assignee':{'name': assignee},
+                            'reporter':{'name': assignee},
                             'customfield_10202': spoints,
                             'customfield_10502': {"value": team}  # TODO: needs testing
                             }
@@ -105,6 +108,10 @@ class Jira:
 
     def create_jira_ticket(self,project,summary,description,assignee, wbs=None, start=None, due=None, spoints=None,
                            team=None):
+
+        if assignee is None:
+            assignee = self.user
+
         if 'ncsa' in self.server.lower():
             ticket_dict = {'project': {'key': project},
                            'customfield_10537': summary,
@@ -112,7 +119,7 @@ class Jira:
                            'summary': summary,
                            'issuetype': {'name': 'Epic'},
                            'description': description,
-                           'assignee': {'name': assignee}, # this works okay!
+                           'reporter': {'name': assignee}, # this works okay!
                            # 'customfield_13234': wbs,
                            'customfield_10630': start.strftime("%Y-%m-%d"),
                            'customfield_11930': due.strftime("%Y-%m-%d"),
@@ -124,7 +131,7 @@ class Jira:
                            'summary': summary,
                            'issuetype':{'name':'Epic'},
                            'description': description,
-                           'assignee':{'name': None}, # too many different emails
+                           'reporter':{'name': assignee},
                            'customfield_10500': wbs,
                            'customfield_11303': start.strftime("%Y-%m-%d"),
                            'customfield_11304': due.strftime("%Y-%m-%d"),
@@ -203,18 +210,21 @@ class Jira:
             return False
 
     def search_for_user(self, email, name):
-        users = self.jira.search_users(email)
+        users_raw = self.jira.search_users(email, maxResults=1000)
+        users = []
         # remove test users
-        for user in users:
-            if 'test' in user.displayName.lower() or 'test' in user.emailAddress.lower():
-                users.remove(user)
+        for user in users_raw:
+            if not ('test' in user.displayName.lower() or 'test' in user.emailAddress.lower()
+                    or 'u829' in user.displayName.lower() or 'databot' in user.displayName.lower()):
+                users.append(user)
         # fallback for different email edge cases
         if len(users) == 0:
             name = name.replace(',', '')
-            users = self.jira.search_users(name)
-            for user in users:
-                if 'test' in user.displayName.lower() or 'test' in user.emailAddress.lower():
-                    users.remove(user)
+            users_raw = self.jira.search_users(name)
+            for user in users_raw:
+                if not ('test' in user.displayName.lower() or 'test' in user.emailAddress.lower()
+                        or 'u829' in user.displayName.lower() or 'databot' in user.displayName.lower()):
+                    users.append(user)
         return users
 
 

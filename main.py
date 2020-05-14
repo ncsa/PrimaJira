@@ -477,7 +477,7 @@ if __name__ == '__main__':
     vpn_toggle(True)
     # tickets = get_activity_tickets(primaserver, primauser, primapasswd, jcon.server)
     # step_tickets = get_step_tickets(primaserver, primauser, primapasswd, jcon.server)
-    synched = get_synched_activities(primaserver, primauser, primapasswd, jcon.server, 'Blue') #todo change to Yellow
+    synched = get_synched_activities(primaserver, primauser, primapasswd, jcon.server, 'Yellow') #todo change to Yellow
     activities, steps = get_steps_activities(jcon, synched, primaserver, primauser, primapasswd)
 
     # pass
