@@ -339,12 +339,13 @@ def vpn_toggle(switch):
     :param switch: bool
     :return: None
     """
+    import kalm as k
     if switch:
         shlog.normal('Engaging VPN...')
-        os.system('cat login | ./panyc.py connect -')
+        k.engage()
     if not switch:
         shlog.normal('Disabling VPN...')
-        os.system('python3 panyc.py disconnect; killall -9 vpn')
+        k.disengage()
 
 
 def get_step_owner(serv, usr, passw, step):
