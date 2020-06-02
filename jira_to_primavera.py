@@ -153,4 +153,4 @@ if __name__ == '__main__':
         # get primavera step count
 
         # completedness is handled elsewhere (by a cron job)
-        m.vpn_toggle(False)
+    m.vpn_toggle(False)

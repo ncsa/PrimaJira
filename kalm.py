@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 import os
 import configparser
+import time
 
 
 def engage():
@@ -17,6 +18,8 @@ def engage():
     # issue connect command
     command = "printf '" + login + "\n\n" + password + "\ny' | /opt/cisco/anyconnect/bin/vpn -s connect " + host
     os.system(command)
+    # timeout while we connect
+    time.sleep(30)
     return
 
 
@@ -24,4 +27,6 @@ def disengage():
     # issue disconnect command
     command = "/opt/cisco/anyconnect/bin/vpn disconnect"
     os.system(command)
+    # timeout while we disconnect
+    time.sleep(5)
     return
