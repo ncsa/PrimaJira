@@ -10,6 +10,7 @@ import jira
 
 
 if __name__ == '__main__':
+    m.vpn_toggle(True)
     # read config and get primavera login info
     parser = configparser.ConfigParser()
     with open('login') as configfile:
@@ -27,7 +28,6 @@ if __name__ == '__main__':
     # init jira connection
     jcon = Jira('jira-section')
 
-    m.vpn_toggle(True)
     # get all NCSA activities and steps with green checkmarks
     synched = m.get_synched_activities(primaserver, primauser, primapasswd, 'https://jira.ncsa.illinois.edu', 'Green')
     activities, steps = m.get_steps_activities(jcon, synched, primaserver, primauser, primapasswd)
