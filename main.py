@@ -431,9 +431,12 @@ def get_email(jcon, serv, usr, passw, objectid):
 
 
 def get_email_step(jcon, serv, usr, passw, name):
-    name = name.replace(',', '')
-    name_first = name.split(' ')[0]
-    name_last = name.split(' ')[-1]
+    try:
+        name = name.replace(',', '')
+        name_first = name.split(' ')[0]
+        name_last = name.split(' ')[-1]
+    except AttributeError:
+        return None
 
     request_data = {'Field': ['EmailAddress', 'Name'],
                     'Filter': "PersonalName like '%%%s%%' and PersonalName like '%%%s%%'" % (name_first, name_last)}
