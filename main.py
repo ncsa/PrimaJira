@@ -272,8 +272,8 @@ def get_steps_activities(jcon, synched, server, user, passw):
                                           'Description': step.Description,
                                           'ProjectId': step.ProjectId,
                                           'Weight': step.Weight,
-                                          'Owner': get_email_step(jcon, primaserver, primauser, primapasswd,
-                                                                  get_step_owner(primaserver, primauser, primapasswd,
+                                          'Owner': get_email_step(jcon, server, user, passw,
+                                                                  get_step_owner(server, user, passw,
                                                                                  str(step.ObjectId)))
                                           }})
     return activities, steps

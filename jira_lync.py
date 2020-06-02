@@ -20,10 +20,6 @@ if __name__ == '__main__':
     primauser = primadict['user']
     primapasswd = primadict['passwd']
     primaserver = primadict['server']
-    print(primadict)
-    print(primauser)
-    print(primapasswd)
-    print(primaserver)
     # read jira info for verbose output
     jiradict = parser['jira-section']
     jiraproject = jiradict['project']
