@@ -196,7 +196,7 @@ class Jira:
         if 'ncsa' in self.server.lower():
             jql = 'project = "%s" and id = "%s" and (status = "Closed" or status = "Resolved")' % (project, issue)
         if 'lsst' in self.server.lower():
-            jql = 'project = "%s" and id = "%s" and status = "Done"' % (project, issue)
+            jql = """project = "%s" and id = "%s" and (status = "Done" or status = "Won't Fix")""" % (project, issue)
         shlog.verbose('JQL: ' + jql)
         try:
             count = len(self.jira.search_issues(jql))
