@@ -9,6 +9,10 @@ import configparser
 import shlog
 from datetime import datetime
 import jira
+import requests
+from requests.auth import HTTPBasicAuth
+import json
+import networkx as nx
 
 
 # init logger
@@ -31,13 +35,50 @@ class Jira:
         jirapasswd=jiradict['passwd']
         jiraserver=jiradict['server']
         jiraproject = jiradict['project']
+        jiraworkflow = jiradict['workflow']
         jira=JIRA(options={'server':jiraserver},basic_auth=(jirauser,jirapasswd))
         self.jira = jira
         self.server = jiraserver
         self.user = jirauser
         self.project = jiraproject
+        self.workflow = jiraworkflow
+        self.pw = jirapasswd
         shlog.verbose('JIRA connection will use:\nServer: ' + jiraserver +
                       '\nUser: ' + jirauser + '\nPass: ' + '*'*len(jirapasswd) + '\nProject: ' + jiraproject)
+
+
+    def transitionX(self, start, desired):
+        wf_url = self.workflow.replace(' ','%20')
+        url = self.server + "/rest/projectconfig/1/workflow?workflowName=" + wf_url + "&projectKey=" + self.project
+        auth = HTTPBasicAuth(self.user, self.pw)
+        headers = {"Accept": "application/json"}
+        response = requests.request("GET", url, headers=headers, auth=auth)
+
+        # networkx starts here
+        nodes = []
+        edges = []
+        workflow = json.loads(response.text)
+        for source in workflow['sources']:
+            source_name = source['fromStatus']['name']
+            # print(source_name)
+            # add node to node list
+            nodes.append(source_name)
+            for target in source['targets']:
+                target_name = target['toStatus']['name']
+                # print('     ' + target_name)
+                # add edge to edge list
+                edges.append((source_name, target_name))
+            # print('______')
+
+        # now that we have the nodes and edges, we can construct the
+        g = nx.DiGraph()
+        g.add_nodes_from(nodes)
+        g.add_edges_from(edges)
+        try:
+            return nx.shortest_path(g, start, desired)
+        except nx.exception.NetworkXNoPath:
+            shlog.normal('No path found between ' + start + ' and ' + target)
+            return None
 
     def search_for_issue(self,summary,parent=None, name_only_search=False):
         summary = summary.replace('"','') # checked - search still works the same
@@ -68,8 +109,34 @@ class Jira:
         return (issue, count)
 
     def get_issue(self,key):
-        issue_info = self.jira.issue(key)
+        try:
+            issue_info = self.jira.issue(key)
+        except jira.exceptions.JIRAError:
+            # triggered by issue not existing
+            shlog.normal(key + " not found!")
+            return None
         return issue_info
+
+    def get_available_statuses(self):
+        return self.jira.statuses()
+
+    def post_status(self,ticket,status):
+        # check if we're already in the right status
+        target_issue = self.get_issue(ticket)
+        if target_issue:
+            target_status = str(target_issue.fields.status)
+            if target_status == status or target_status == "Won't Fix" or target_status == "Invalid":
+                shlog.verbose(ticket + ' status ' + target_status + ' matches desired status ' + status + ', skipping...')
+                return
+            else:
+                # retrieve transitions needed to get to desired status
+                transitions = self.transitionX(target_status, status)
+                for stat in transitions[1:]:
+                    shlog.verbose('Posting status ' + stat + ' to ticket ' + ticket)
+                    self.jira.transition_issue(ticket, transition=stat)
+        else:
+            return
+
 
     def create_jira_subtask(self,parent,summary,description,assignee,spoints=None,team=None):
         try:
