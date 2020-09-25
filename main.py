@@ -550,4 +550,4 @@ if __name__ == '__main__':
         e.remove_colors(primaserver, primauser, primapasswd, act, code)
         e.post_color(primaserver, primauser, primapasswd, act, 'Green', code)
 
-    vpn_toggle(True)
+    vpn_toggle(False)
