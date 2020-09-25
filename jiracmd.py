@@ -9,6 +9,10 @@ import configparser
 import shlog
 from datetime import datetime
 import jira
+import requests
+from requests.auth import HTTPBasicAuth
+import json
+import networkx as nx
 
 
 # init logger
@@ -31,13 +35,50 @@ class Jira:
         jirapasswd=jiradict['passwd']
         jiraserver=jiradict['server']
         jiraproject = jiradict['project']
+        jiraworkflow = jiradict['workflow']
         jira=JIRA(options={'server':jiraserver},basic_auth=(jirauser,jirapasswd))
         self.jira = jira
         self.server = jiraserver
         self.user = jirauser
         self.project = jiraproject
+        self.workflow = jiraworkflow
+        self.pw = jirapasswd
         shlog.verbose('JIRA connection will use:\nServer: ' + jiraserver +
                       '\nUser: ' + jirauser + '\nPass: ' + '*'*len(jirapasswd) + '\nProject: ' + jiraproject)
+
+
+    def transitionX(self, start, desired):
+        wf_url = self.workflow.replace(' ','%20')
+        url = self.server + "/rest/projectconfig/1/workflow?workflowName=" + wf_url + "&projectKey=" + self.project
+        auth = HTTPBasicAuth(self.user, self.pw)
+        headers = {"Accept": "application/json"}
+        response = requests.request("GET", url, headers=headers, auth=auth)
+
+        # networkx starts here
+        nodes = []
+        edges = []
+        workflow = json.loads(response.text)
+        for source in workflow['sources']:
+            source_name = source['fromStatus']['name']
+            # print(source_name)
+            # add node to node list
+            nodes.append(source_name)
+            for target in source['targets']:
+                target_name = target['toStatus']['name']
+                # print('     ' + target_name)
+                # add edge to edge list
+                edges.append((source_name, target_name))
+            # print('______')
+
+        # now that we have the nodes and edges, we can construct the
+        g = nx.DiGraph()
+        g.add_nodes_from(nodes)
+        g.add_edges_from(edges)
+        try:
+            return nx.shortest_path(g, start, desired)
+        except nx.exception.NetworkXNoPath:
+            shlog.normal('No path found between ' + start + ' and ' + target)
+            return None
 
     def search_for_issue(self,summary,parent=None, name_only_search=False):
         summary = summary.replace('"','') # checked - search still works the same
@@ -68,8 +109,34 @@ class Jira:
         return (issue, count)
 
     def get_issue(self,key):
-        issue_info = self.jira.issue(key)
+        try:
+            issue_info = self.jira.issue(key)
+        except jira.exceptions.JIRAError:
+            # triggered by issue not existing
+            shlog.normal(key + " not found!")
+            return None
         return issue_info
+
+    def get_available_statuses(self):
+        return self.jira.statuses()
+
+    def post_status(self,ticket,status):
+        # check if we're already in the right status
+        target_issue = self.get_issue(ticket)
+        if target_issue:
+            target_status = str(target_issue.fields.status)
+            if target_status == status or target_status == "Won't Fix" or target_status == "Invalid":
+                shlog.verbose(ticket + ' status ' + target_status + ' matches desired status ' + status + ', skipping...')
+                return
+            else:
+                # retrieve transitions needed to get to desired status
+                transitions = self.transitionX(target_status, status)
+                for stat in transitions[1:]:
+                    shlog.verbose('Posting status ' + stat + ' to ticket ' + ticket)
+                    self.jira.transition_issue(ticket, transition=stat)
+        else:
+            return
+
 
     def create_jira_subtask(self,parent,summary,description,assignee,spoints=None,team=None):
         try:
@@ -79,6 +146,9 @@ class Jira:
             print(warning)
             sys.exit()
 
+        if assignee is None:
+            assignee = self.user
+
         if 'ncsa' in self.server.lower():
             subtask_dict = {'project': {'key': parent_issue.fields.project.key},
                             'summary': summary,
@@ -86,7 +156,7 @@ class Jira:
                             'issuetype': {'name': 'Story'},
                             'description': description,
                             'customfield_10536': parent_issue.key,  # this is the epic link
-                            'assignee': {'name': assignee},
+                            'reporter': {'name': assignee},
                             'customfield_10532': spoints
                             }
         if 'lsst' in self.server.lower():
@@ -96,15 +166,19 @@ class Jira:
                             'issuetype':{'name':'Story'},
                             'description': description,
                             'customfield_10206': parent_issue.key, # this is the epic link
-                            'assignee':{'name': assignee},
+                            'reporter':{'name': assignee},
                             'customfield_10202': spoints,
-                            'customfield_10502': team  # TODO: needs testing
+                            'customfield_10502': {"value": team}  # TODO: needs testing
                             }
         subtask = self.jira.create_issue(fields=subtask_dict)
         return subtask.key
 
     def create_jira_ticket(self,project,summary,description,assignee, wbs=None, start=None, due=None, spoints=None,
                            team=None):
+
+        if assignee is None:
+            assignee = self.user
+
         if 'ncsa' in self.server.lower():
             ticket_dict = {'project': {'key': project},
                            'customfield_10537': summary,
@@ -112,7 +186,7 @@ class Jira:
                            'summary': summary,
                            'issuetype': {'name': 'Epic'},
                            'description': description,
-                           'assignee': {'name': assignee}, # this works okay!
+                           'reporter': {'name': assignee}, # this works okay!
                            # 'customfield_13234': wbs,
                            'customfield_10630': start.strftime("%Y-%m-%d"),
                            'customfield_11930': due.strftime("%Y-%m-%d"),
@@ -124,12 +198,12 @@ class Jira:
                            'summary': summary,
                            'issuetype':{'name':'Epic'},
                            'description': description,
-                           'assignee':{'name': None}, # too many different emails
+                           'reporter':{'name': assignee},
                            'customfield_10500': wbs,
                            'customfield_11303': start.strftime("%Y-%m-%d"),
                            'customfield_11304': due.strftime("%Y-%m-%d"),
                            'customfield_10202': spoints,
-                           'customfield_10502': team  # TODO: needs testing
+                           'customfield_10502': {"value": team}  # TODO: needs testing
                            }
         ticket = self.jira.create_issue(fields=ticket_dict)
         return ticket.key
@@ -189,7 +263,7 @@ class Jira:
         if 'ncsa' in self.server.lower():
             jql = 'project = "%s" and id = "%s" and (status = "Closed" or status = "Resolved")' % (project, issue)
         if 'lsst' in self.server.lower():
-            jql = 'project = "%s" and id = "%s" and status = "Done"' % (project, issue)
+            jql = """project = "%s" and id = "%s" and (status = "Done" or status = "Won't Fix")""" % (project, issue)
         shlog.verbose('JQL: ' + jql)
         try:
             count = len(self.jira.search_issues(jql))
@@ -202,8 +276,22 @@ class Jira:
         else:
             return False
 
-    def search_for_user(self, email):
-        users = self.jira.search_users(email)
+    def search_for_user(self, email, name):
+        users_raw = self.jira.search_users(email, maxResults=1000)
+        users = []
+        # remove test users
+        for user in users_raw:
+            if not ('test' in user.displayName.lower() or 'test' in user.emailAddress.lower()
+                    or 'u829' in user.displayName.lower() or 'databot' in user.displayName.lower()):
+                users.append(user)
+        # fallback for different email edge cases
+        if len(users) == 0:
+            name = name.replace(',', '')
+            users_raw = self.jira.search_users(name)
+            for user in users_raw:
+                if not ('test' in user.displayName.lower() or 'test' in user.emailAddress.lower()
+                        or 'u829' in user.displayName.lower() or 'databot' in user.displayName.lower()):
+                    users.append(user)
         return users
 
 

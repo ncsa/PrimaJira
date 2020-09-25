@@ -10,6 +10,7 @@ import jira
 
 
 if __name__ == '__main__':
+    m.vpn_toggle(True)
     # read config and get primavera login info
     parser = configparser.ConfigParser()
     with open('login') as configfile:
@@ -27,10 +28,9 @@ if __name__ == '__main__':
     # init jira connection
     jcon = Jira('jira-section')
 
-    m.vpn_toggle(True)
     # get all NCSA activities and steps with green checkmarks
     synched = m.get_synched_activities(primaserver, primauser, primapasswd, 'https://jira.ncsa.illinois.edu', 'Green')
-    activities, steps = m.get_steps_activities(synched, primaserver, primauser, primapasswd)
+    activities, steps = m.get_steps_activities(jcon, synched, primaserver, primauser, primapasswd)
 
     # build two dicts with actid to jira ids
     ncsa_tickets = m.get_activity_tickets(primaserver, primauser, primapasswd, 'ncsa')
@@ -47,7 +47,8 @@ if __name__ == '__main__':
                 shlog.normal('Success linking ' + ncsa_tickets[act] + ' and ' + lsst_tickets[act])
             except (jira.exceptions.JIRAError) as e:
                 # jira failures mean we can't sync anything
-                shlog.normal('Jira operation faled with error:')
+                shlog.normal('Jira operation for Epic ' + ncsa_tickets[act] + '/' + lsst_tickets[act] +
+                             ' faled with error:')
                 print(e)
         activity_steps = m.step_list_filter(steps, act)
         for step in activity_steps:
@@ -57,6 +58,7 @@ if __name__ == '__main__':
                     shlog.normal('Success linking ' + ncsa_step_tickets[step] + ' and ' + lsst_step_tickets[step])
                 except (jira.exceptions.JIRAError) as e:
                     # jira failures mean we can't sync anything
-                    shlog.normal('Jira operation faled with error:')
+                    shlog.normal('Jira operation for Story ' + ncsa_step_tickets[step] + '/' + lsst_step_tickets[step] +
+                                 ' faled with error:')
                     print(e)
     m.vpn_toggle(False)

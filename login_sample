@@ -6,6 +6,14 @@ project = LSSTTST
 user = ekimtcov.v@gmail.com
 passwd = pass
 server = https://jira.ncsa.illinois.edu
+workflow =
+
+[jira-target]
+project = DM
+user = ekimtco2
+passwd = pass
+server = https://jira.ncsa.illinois.edu
+workflow = Software Simplified Workflow for Project DM
 
 [primavera-section]
 user = ekimtcov

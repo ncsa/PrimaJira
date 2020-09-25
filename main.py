@@ -41,7 +41,7 @@ def xmlpost(url, user, pw, ComplexType, element, RequestCore):
     shlog.verbose('Making request to url ' + url)
     shlog.verbose('Request body: ' + body.replace(pw, '*'*len(pw)))
     response = requests.post(url, verify=False, data=body)
-    shlog.verbose('Server response: ' + response.content)
+    shlog.verbose('Server response: ' + str(response.content))
     return response
 
 
@@ -219,7 +219,7 @@ def get_synched_activities(servr, user, passw, jiraserv, color):
     return synched
 
 
-def get_steps_activities(synched, server, user, passw):
+def get_steps_activities(jcon, synched, server, user, passw):
     activities = {}
     steps = {}
     baseline = actual_baseline(server, user, passw)
@@ -271,7 +271,10 @@ def get_steps_activities(synched, server, user, passw):
                                           'Name': step.Name,
                                           'Description': step.Description,
                                           'ProjectId': step.ProjectId,
-                                          'Weight': step.Weight
+                                          'Weight': step.Weight,
+                                          'Owner': get_email_step(jcon, server, user, passw,
+                                                                  get_step_owner(server, user, passw,
+                                                                                 str(step.ObjectId)))
                                           }})
     return activities, steps
 
@@ -336,12 +339,25 @@ def vpn_toggle(switch):
     :param switch: bool
     :return: None
     """
+    import kalm as k
     if switch:
         shlog.normal('Engaging VPN...')
-        os.system('cat login | ./panyc.py connect -')
+        k.engage()
     if not switch:
         shlog.normal('Disabling VPN...')
-        os.system('python3 panyc.py disconnect; killall -9 vpn')
+        k.disengage()
+
+
+def get_step_owner(serv, usr, passw, step):
+    request_data = {
+        'Field': ['Text'],
+        'Filter': "ForeignObjectId = '%s'" % str(step)}
+    synched = soap_request(request_data, serv, 'UDFValueService', 'ReadUDFValues', usr, passw)
+
+    try:
+        return synched[0]['Text']
+    except IndexError:
+        return None
 
 
 def actual_baseline(serv, usr, passw):
@@ -399,15 +415,38 @@ def get_email(jcon, serv, usr, passw, objectid):
     :param objectid: ID of activity object
     :return: None or user
     """
-    request_data = {'Field': ['EmailAddress'],
+    request_data = {'Field': ['EmailAddress', 'Name'],
                     'Filter': "ObjectId = '%s'" % objectid}
     if objectid:  # if it's not None
         synched = soap_request(request_data, serv, 'UserService', 'ReadUsers', usr, passw)
     else:
         return None
 
-    k = jcon.search_for_user(synched[0]['EmailAddress'])
     try:
+        k = jcon.search_for_user(synched[0]['EmailAddress'], synched[0]['Name'])
+        name = k[0].name
+        return name
+    except IndexError:
+        return None
+
+
+def get_email_step(jcon, serv, usr, passw, name):
+    try:
+        name = name.replace(',', '')
+        name_first = name.split(' ')[0]
+        name_last = name.split(' ')[-1]
+    except AttributeError:
+        return None
+
+    request_data = {'Field': ['EmailAddress', 'Name'],
+                    'Filter': "PersonalName like '%%%s%%' and PersonalName like '%%%s%%'" % (name_first, name_last)}
+    if name:  # if it's not None
+        synched = soap_request(request_data, serv, 'UserService', 'ReadUsers', usr, passw)
+    else:
+        return None
+
+    try:
+        k = jcon.search_for_user(synched[0]['EmailAddress'], synched[0]['Name'])
         name = k[0].name
         return name
     except IndexError:
@@ -442,8 +481,8 @@ if __name__ == '__main__':
     vpn_toggle(True)
     # tickets = get_activity_tickets(primaserver, primauser, primapasswd, jcon.server)
     # step_tickets = get_step_tickets(primaserver, primauser, primapasswd, jcon.server)
-    synched = get_synched_activities(primaserver, primauser, primapasswd, jcon.server, 'Yellow')
-    activities, steps = get_steps_activities(synched, primaserver, primauser, primapasswd)
+    synched = get_synched_activities(primaserver, primauser, primapasswd, jcon.server, 'Yellow') #todo change to Yellow
+    activities, steps = get_steps_activities(jcon, synched, primaserver, primauser, primapasswd)
 
     # pass
     # exit(0) # A6830
@@ -490,7 +529,7 @@ if __name__ == '__main__':
             except UnicodeEncodeError:
                 shlog.normal('A Unicode error happened when processing ' + steps[step]['Name'] +
                              ', but nobody cared')
-            step_reqnum, step_jira_id = ju.create_ticket('jira-section', None, ticket=None, parent=reqnum,
+            step_reqnum, step_jira_id = ju.create_ticket('jira-section', steps[step]['Owner'], ticket=None, parent=reqnum,
                                     summary=steps[step]['Name'], description=steps[step]['Description'],
                                     project=jcon.project, spoints=steps[step]['Weight'], team=team)
             shlog.normal('Returned JIRA ticket ' + step_jira_id)
@@ -511,4 +550,4 @@ if __name__ == '__main__':
         e.remove_colors(primaserver, primauser, primapasswd, act, code)
         e.post_color(primaserver, primauser, primapasswd, act, 'Green', code)
 
-    vpn_toggle(True)
+    vpn_toggle(False)
